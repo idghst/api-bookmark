@@ -81,6 +81,10 @@ class FakeQuery:
         self.filters.append((column, value))
         return self
 
+    def neq(self, column: str, value: object) -> "FakeQuery":
+        self.filters.append((f"{column}__neq", value))
+        return self
+
     def order(self, column: str, *, desc: bool = False) -> "FakeQuery":
         self.ordering = (column, desc)
         return self
@@ -105,6 +109,13 @@ class FakeSupabase:
         query = FakeQuery(self, name)
         self.queries.append(query)
         return query
+
+
+class FakeHttpClient:
+    closed = False
+
+    async def aclose(self) -> None:
+        self.closed = True
 
 
 def _user() -> User:
@@ -154,29 +165,35 @@ def test_resources_accept_configured_service_key(
     from app.core.config import Settings
     from app.integrations import supabase
 
-    fake = FakeSupabase([BOOKMARK])
+    fake = FakeSupabase(
+        [{"user_id": "user-123"}],
+        [],
+        [],
+        [],
+        [BOOKMARK],
+    )
+    http_client = FakeHttpClient()
 
-    async def authenticated(*_: object) -> AsyncIterator[AuthContext]:
-        yield AuthContext(user=_user(), client=cast(AsyncClient, fake))
+    async def create_client(*_: object) -> tuple[AsyncClient, httpx.AsyncClient]:
+        return cast(AsyncClient, fake), cast(httpx.AsyncClient, http_client)
 
-    monkeypatch.setattr(supabase, "get_auth_context", authenticated)
+    monkeypatch.setattr(supabase, "_new_client", create_client)
     settings = Settings(
         SUPABASE_URL="https://test.supabase.co",
         SUPABASE_PUBLISHABLE_KEY="sb_publishable_test",
+        SUPABASE_SECRET_KEY="sb_secret_test",
         BOOKMARK_API_KEY="bookmark-api-secret",
     )
 
     response = TestClient(create_app(settings)).get(
         "/api/bookmarks",
-        headers={
-            "Authorization": "Bearer test",
-            "X-Bookmark-Key": "bookmark-api-secret",
-        },
+        headers={"X-Bookmark-Key": "bookmark-api-secret"},
     )
 
     assert response.status_code == 200
     assert response.json()[0]["id"] == "bookmark-1"
-    _assert_user_scoped(fake.queries[0])
+    _assert_user_scoped(fake.queries[-1])
+    assert http_client.closed is True
 
 
 def test_resources_reject_invalid_service_key() -> None:
@@ -646,27 +663,33 @@ def test_graphql_accepts_the_same_service_key(
     from app.core.config import Settings
     from app.integrations import supabase
 
-    fake = FakeSupabase([BOOKMARK])
+    fake = FakeSupabase(
+        [{"user_id": "user-123"}],
+        [],
+        [],
+        [],
+        [BOOKMARK],
+    )
+    http_client = FakeHttpClient()
 
-    async def authenticated(*_: object) -> AsyncIterator[AuthContext]:
-        yield AuthContext(user=_user(), client=cast(AsyncClient, fake))
+    async def create_client(*_: object) -> tuple[AsyncClient, httpx.AsyncClient]:
+        return cast(AsyncClient, fake), cast(httpx.AsyncClient, http_client)
 
-    monkeypatch.setattr(supabase, "get_auth_context", authenticated)
+    monkeypatch.setattr(supabase, "_new_client", create_client)
     settings = Settings(
         SUPABASE_URL="https://test.supabase.co",
         SUPABASE_PUBLISHABLE_KEY="sb_publishable_test",
+        SUPABASE_SECRET_KEY="sb_secret_test",
         BOOKMARK_API_KEY="bookmark-api-secret",
     )
 
     response = TestClient(create_app(settings)).post(
         "/graphql",
         json={"query": "{ bookmarks { id } }"},
-        headers={
-            "Authorization": "Bearer test",
-            "X-Bookmark-Key": "bookmark-api-secret",
-        },
+        headers={"X-Bookmark-Key": "bookmark-api-secret"},
     )
 
     assert response.status_code == 200
     assert response.json() == {"data": {"bookmarks": [{"id": "bookmark-1"}]}}
-    _assert_user_scoped(fake.queries[0])
+    _assert_user_scoped(fake.queries[-1])
+    assert http_client.closed is True

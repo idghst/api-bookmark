@@ -6,6 +6,7 @@ from typing import Annotated
 import httpx
 from fastapi import Depends, Header
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from postgrest.exceptions import APIError as PostgrestAPIError
 from supabase_auth.errors import AuthApiError, AuthRetryableError, AuthUnknownError
 from supabase_auth.types import User
 
@@ -17,9 +18,70 @@ _bearer = HTTPBearer(auto_error=False)
 
 
 @dataclass(frozen=True)
+class ServiceUser:
+    id: str
+    email: None = None
+
+
+@dataclass(frozen=True)
 class AuthContext:
-    user: User
+    user: User | ServiceUser
     client: AsyncClient
+
+
+async def _get_service_user(client: AsyncClient) -> ServiceUser:
+    tables = ("folders", "sections", "items")
+    owner_id: str | None = None
+    try:
+        for table in tables:
+            response = await client.table(table).select("user_id").limit(1).execute()
+            rows = response.data
+            if not isinstance(rows, list):
+                raise TypeError("invalid owner response")
+            if rows:
+                first = rows[0]
+                if not isinstance(first, dict):
+                    raise TypeError("invalid owner row")
+                value = first.get("user_id")
+                if not isinstance(value, str) or not value:
+                    raise ValueError("invalid owner value")
+                owner_id = value
+                break
+
+        if owner_id is None:
+            raise ApiError(
+                503,
+                "service_identity_unavailable",
+                "Service identity is unavailable",
+            )
+
+        for table in tables:
+            response = (
+                await client.table(table)
+                .select("user_id")
+                .neq("user_id", owner_id)
+                .limit(1)
+                .execute()
+            )
+            rows = response.data
+            if not isinstance(rows, list):
+                raise TypeError("invalid owner response")
+            if rows:
+                raise ApiError(
+                    503,
+                    "service_identity_unavailable",
+                    "Service identity is unavailable",
+                )
+    except ApiError:
+        raise
+    except (PostgrestAPIError, httpx.HTTPError, TypeError, ValueError) as error:
+        raise ApiError(
+            503,
+            "service_identity_unavailable",
+            "Service identity is unavailable",
+        ) from error
+
+    return ServiceUser(id=owner_id)
 
 
 async def _new_client(
@@ -97,6 +159,10 @@ async def get_resource_auth_context(
             configured_key.get_secret_value(),
         ):
             raise ApiError(401, "invalid_api_key", "Invalid API key")
+
+        async for client in get_admin_client(settings):
+            yield AuthContext(user=await _get_service_user(client), client=client)
+        return
 
     async for context in get_auth_context(credentials, settings):
         yield context

@@ -15,9 +15,10 @@ REST와 GraphQL을 함께 제공하는 개인 북마크 FastAPI 서비스입니�
 
 `/api/bookmarks`, `/api/folders`, `/api/sections`, `/graphql` 요청은 사용자용
 `Authorization: Bearer <Supabase access token>` 또는 개인 Next.js 서버용
-`X-Bookmark-Key`를 요구합니다. `X-Bookmark-Key`를 사용할 때도
-`Authorization: Bearer <Supabase access token>`을 함께 보내며, 요청 전용 RLS
-클라이언트와 `user_id` 조건으로 소유자를 제한합니다.
+`X-Bookmark-Key`를 요구합니다. `X-Bookmark-Key` 요청은
+`SUPABASE_SECRET_KEY` 관리자 클라이언트로 기존 데이터의 유일한 `user_id`
+소유자를 자동 선택하고 같은 소유자 조건으로 제한합니다. 데이터가 비어 있거나
+소유자가 둘 이상이면 서비스 요청을 거부합니다.
 
 ## API
 
@@ -88,8 +89,8 @@ BOOKMARK_API_KEY=
 
 `CORS_ORIGINS`는 정확한 HTTP(S) origin 배열만 허용합니다. Production에서는
 `SUPABASE_URL`이 HTTPS여야 하며 API 문서는 기본적으로 비활성화됩니다.
-서버 간 호출을 사용하면 `BOOKMARK_API_KEY`를 설정하고 Supabase access token을
-함께 전달합니다.
+서버 간 호출을 사용하면 `BOOKMARK_API_KEY`와 `SUPABASE_SECRET_KEY`를 설정하고
+`X-Bookmark-Key`만 전달합니다.
 
 ## Supabase
 
@@ -125,7 +126,6 @@ curl \
 ```bash
 curl \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
   -H "X-Bookmark-Key: $BOOKMARK_API_KEY" \
   --data '{"query":"{ bookmarks { id title url } }"}' \
   http://localhost:8000/graphql
