@@ -561,6 +561,7 @@ def test_graphql_bookmark_mutations_share_rest_crud_and_user_scope() -> None:
 
 def test_graphql_folder_and_section_mutations_share_rest_crud() -> None:
     updated_folder = {**FOLDER, "name": "Updated"}
+    updated_section = {**SECTION, "name": "Updated section"}
     fake = FakeSupabase(
         [],
         [FOLDER],
@@ -569,6 +570,7 @@ def test_graphql_folder_and_section_mutations_share_rest_crud() -> None:
         [{"id": "folder-1"}],
         [],
         [SECTION],
+        [updated_section],
         [{"id": "section-1"}],
         [{"id": "section-1"}],
     )
@@ -592,6 +594,10 @@ def test_graphql_folder_and_section_mutations_share_rest_crud() -> None:
                   createdSection: createSection(
                     input: { folderId: "folder-1", name: "Reading" }
                   ) { id name folderId position }
+                  updatedSection: updateSection(
+                    id: "section-1"
+                    input: { name: "Updated section" }
+                  ) { id name }
                   deletedSection: deleteSection(id: "section-1")
                   reorderedSections: reorderSections(
                     input: [{ id: "section-1", position: 2 }]
@@ -620,6 +626,7 @@ def test_graphql_folder_and_section_mutations_share_rest_crud() -> None:
                 "folderId": "folder-1",
                 "position": 0,
             },
+            "updatedSection": {"id": "section-1", "name": "Updated section"},
             "deletedSection": True,
             "reorderedSections": True,
         }
@@ -629,6 +636,8 @@ def test_graphql_folder_and_section_mutations_share_rest_crud() -> None:
         ("folder_id", "folder-1"),
     ]
     assert fake.queries[6].payload["user_id"] == "user-123"
+    assert fake.queries[7].payload["name"] == "Updated section"
+    _assert_user_scoped(fake.queries[7])
 
 
 def test_graphql_maps_missing_rows_to_not_found() -> None:

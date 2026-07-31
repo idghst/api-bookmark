@@ -20,6 +20,7 @@ from app.schemas import (
     PositionUpdate,
     SectionCreate,
     SectionOut,
+    SectionUpdate,
 )
 from app.services import bookmarks
 
@@ -137,6 +138,11 @@ class FolderUpdateInput:
 class SectionCreateInput:
     folder_id: strawberry.ID
     name: str
+
+
+@strawberry.input
+class SectionUpdateInput:
+    name: str | None = strawberry.UNSET
 
 
 @strawberry.input
@@ -283,6 +289,22 @@ class Mutation:
         row = await _resolve(
             bookmarks.create_section(
                 SectionCreate(folderId=input.folder_id, name=input.name),
+                info.context.auth,
+            )
+        )
+        return Section.from_model(row)
+
+    @strawberry.mutation
+    async def update_section(
+        self,
+        info: Info[GraphQLContext, None],
+        id: strawberry.ID,
+        input: SectionUpdateInput,
+    ) -> Section:
+        row = await _resolve(
+            bookmarks.update_section(
+                id,
+                SectionUpdate.model_validate(_update_values(input)),
                 info.context.auth,
             )
         )
