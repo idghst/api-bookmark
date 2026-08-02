@@ -73,6 +73,7 @@ class Folder:
     id: strawberry.ID
     name: str
     color: str | None
+    parent_id: strawberry.ID | None
     position: int
 
     @classmethod
@@ -81,6 +82,9 @@ class Folder:
             id=strawberry.ID(model.id),
             name=model.name,
             color=model.color,
+            parent_id=(
+                strawberry.ID(model.parent_id) if model.parent_id is not None else None
+            ),
             position=model.position,
         )
 
@@ -126,12 +130,15 @@ class BookmarkUpdateInput:
 class FolderCreateInput:
     name: str
     color: str | None = None
+    parent_id: strawberry.ID | None = None
 
 
 @strawberry.input
 class FolderUpdateInput:
     name: str | None = strawberry.UNSET
     color: str | None = strawberry.UNSET
+    parent_id: strawberry.ID | None = strawberry.UNSET
+    position: int | None = strawberry.UNSET
 
 
 @strawberry.input
@@ -240,7 +247,11 @@ class Mutation:
     ) -> Folder:
         row = await _resolve(
             bookmarks.create_folder(
-                FolderCreate(name=input.name, color=input.color),
+                FolderCreate(
+                    name=input.name,
+                    color=input.color,
+                    parentId=input.parent_id,
+                ),
                 info.context.auth,
             )
         )
@@ -267,8 +278,11 @@ class Mutation:
         self,
         info: Info[GraphQLContext, None],
         id: strawberry.ID,
+        destination_folder_id: strawberry.ID | None = None,
     ) -> bool:
-        await _resolve(bookmarks.delete_folder(id, info.context.auth))
+        await _resolve(
+            bookmarks.delete_folder(id, info.context.auth, destination_folder_id)
+        )
         return True
 
     @strawberry.mutation
@@ -366,6 +380,7 @@ async def _resolve[T](awaitable: Awaitable[T]) -> T:
             401: "UNAUTHENTICATED",
             403: "FORBIDDEN",
             404: "NOT_FOUND",
+            409: "CONFLICT",
         }
         raise GraphQLError(
             error.message,

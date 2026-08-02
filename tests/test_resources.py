@@ -30,6 +30,7 @@ FOLDER = {
     "id": "folder-1",
     "name": "Work",
     "color": None,
+    "parent_id": None,
     "position": 0,
     "user_id": "user-123",
 }
@@ -85,6 +86,10 @@ class FakeQuery:
         self.filters.append((f"{column}__neq", value))
         return self
 
+    def is_(self, column: str, value: object) -> "FakeQuery":
+        self.filters.append((f"{column}__is", value))
+        return self
+
     def order(self, column: str, *, desc: bool = False) -> "FakeQuery":
         self.ordering = (column, desc)
         return self
@@ -107,6 +112,13 @@ class FakeSupabase:
 
     def table(self, name: str) -> FakeQuery:
         query = FakeQuery(self, name)
+        self.queries.append(query)
+        return query
+
+    def rpc(self, name: str, params: object) -> FakeQuery:
+        query = FakeQuery(self, f"rpc:{name}")
+        query.action = "rpc"
+        query.payload = params
         self.queries.append(query)
         return query
 
@@ -292,6 +304,74 @@ def test_folder_creation_preserves_color() -> None:
     assert fake.queries[1].payload["color"] == "#123456"
 
 
+def test_folder_creation_scopes_position_to_its_parent() -> None:
+    child = {**FOLDER, "id": "folder-2", "parent_id": "folder-1"}
+    fake = FakeSupabase([FOLDER], [], [child])
+
+    response = _client(fake).post(
+        "/api/folders",
+        json={"name": "Child", "parentId": "folder-1"},
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 201
+    assert fake.queries[0].table == "folders"
+    _assert_user_scoped(fake.queries[0])
+    assert ("parent_id", "folder-1") in fake.queries[1].filters
+    assert isinstance(fake.queries[2].payload, dict)
+    assert fake.queries[2].payload["parent_id"] == "folder-1"
+
+
+def test_folder_move_rejects_a_descendant_as_parent() -> None:
+    child = {**FOLDER, "id": "folder-2", "parent_id": "folder-1"}
+    fake = FakeSupabase([FOLDER, child])
+
+    response = _client(fake).patch(
+        "/api/folders/folder-1",
+        json={"parentId": "folder-2"},
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "folder_parent_invalid"
+    assert len(fake.queries) == 1
+    _assert_user_scoped(fake.queries[0])
+
+
+def test_folder_tree_returns_nested_nodes_from_flat_folders() -> None:
+    child = {**FOLDER, "id": "folder-2", "name": "Child", "parent_id": "folder-1"}
+    fake = FakeSupabase([child, FOLDER])
+
+    response = _client(fake).get(
+        "/api/folders/tree",
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "id": "folder-1",
+            "name": "Work",
+            "color": None,
+            "parentId": None,
+            "position": 0,
+            "userId": "user-123",
+            "children": [
+                {
+                    "id": "folder-2",
+                    "name": "Child",
+                    "color": None,
+                    "parentId": "folder-1",
+                    "position": 0,
+                    "userId": "user-123",
+                    "children": [],
+                }
+            ],
+        }
+    ]
+    _assert_user_scoped(fake.queries[0])
+
+
 @pytest.mark.parametrize(
     ("path", "payload", "table", "row"),
     [
@@ -339,7 +419,6 @@ def test_updates_are_user_scoped(
     ("path", "table"),
     [
         ("/api/bookmarks/bookmark-1", "items"),
-        ("/api/folders/folder-1", "folders"),
         ("/api/sections/section-1", "sections"),
     ],
 )
@@ -354,6 +433,36 @@ def test_deletes_are_user_scoped(path: str, table: str) -> None:
     assert response.status_code == 204
     assert fake.queries[0].table == table
     _assert_user_scoped(fake.queries[0])
+
+
+def test_folder_delete_uses_atomic_destination_rpc() -> None:
+    fake = FakeSupabase([{"id": "folder-1"}])
+
+    response = _client(fake).delete(
+        "/api/folders/folder-1?destination_folder_id=folder-2",
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 204
+    assert fake.queries[0].table == "rpc:delete_folder"
+    assert fake.queries[0].payload == {
+        "p_folder_id": "folder-1",
+        "p_destination_folder_id": "folder-2",
+        "p_user_id": "user-123",
+    }
+
+
+def test_folder_delete_rejects_itself_as_destination() -> None:
+    fake = FakeSupabase()
+
+    response = _client(fake).delete(
+        "/api/folders/folder-1?destination_folder_id=folder-1",
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "folder_destination_invalid"
+    assert fake.queries == []
 
 
 @pytest.mark.parametrize(
@@ -638,6 +747,44 @@ def test_graphql_folder_and_section_mutations_share_rest_crud() -> None:
     assert fake.queries[6].payload["user_id"] == "user-123"
     assert fake.queries[7].payload["name"] == "Updated section"
     _assert_user_scoped(fake.queries[7])
+
+
+def test_graphql_folder_hierarchy_fields_share_rest_contract() -> None:
+    child = {**FOLDER, "id": "folder-2", "name": "Child", "parent_id": "folder-1"}
+    fake = FakeSupabase([FOLDER], [], [child], [{"id": "folder-2"}])
+
+    response = _client(fake).post(
+        "/graphql",
+        json={
+            "query": """
+                mutation {
+                  created: createFolder(input: {
+                    name: "Child"
+                    parentId: "folder-1"
+                  }) { id parentId position }
+                  deleted: deleteFolder(
+                    id: "folder-2"
+                    destinationFolderId: "folder-1"
+                  )
+                }
+            """
+        },
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "data": {
+            "created": {"id": "folder-2", "parentId": "folder-1", "position": 0},
+            "deleted": True,
+        }
+    }
+    assert ("parent_id", "folder-1") in fake.queries[1].filters
+    assert fake.queries[3].payload == {
+        "p_folder_id": "folder-2",
+        "p_destination_folder_id": "folder-1",
+        "p_user_id": "user-123",
+    }
 
 
 def test_graphql_maps_missing_rows_to_not_found() -> None:

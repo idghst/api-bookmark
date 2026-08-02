@@ -9,6 +9,7 @@ from app.schemas import (
     BookmarkUpdate,
     FolderCreate,
     FolderOut,
+    FolderTreeOut,
     FolderUpdate,
     PositionUpdate,
     SectionCreate,
@@ -65,6 +66,11 @@ async def list_folders(auth: AuthDependency) -> list[FolderOut]:
     return await bookmarks.list_folders(auth)
 
 
+@router.get("/folders/tree", response_model=list[FolderTreeOut])
+async def list_folder_tree(auth: AuthDependency) -> list[FolderTreeOut]:
+    return await bookmarks.list_folder_tree(auth)
+
+
 @router.post(
     "/folders",
     response_model=FolderOut,
@@ -87,8 +93,12 @@ async def update_folder(
 
 
 @router.delete("/folders/{folder_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_folder(folder_id: str, auth: AuthDependency) -> None:
-    await bookmarks.delete_folder(folder_id, auth)
+async def delete_folder(
+    folder_id: str,
+    auth: AuthDependency,
+    destination_folder_id: str | None = None,
+) -> None:
+    await bookmarks.delete_folder(folder_id, auth, destination_folder_id)
 
 
 @router.post("/folders/reorder", status_code=status.HTTP_204_NO_CONTENT)

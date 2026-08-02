@@ -6,6 +6,12 @@ MIGRATION = (
     / "migrations"
     / "20260726160000_add_bookmark_resources.sql"
 )
+FOLDER_HIERARCHY_MIGRATION = (
+    Path(__file__).parent.parent
+    / "supabase"
+    / "migrations"
+    / "20260802195716_folder_hierarchy.sql"
+)
 
 
 def test_resource_migration_creates_expected_tables() -> None:
@@ -27,3 +33,21 @@ def test_resource_migration_has_operation_specific_owner_policies() -> None:
     assert sql.count("(select auth.uid()) = user_id") == 15
     assert "to authenticated" in sql
     assert "to anon" not in sql
+
+
+def test_folder_hierarchy_migration_enforces_safe_tree_and_delete_contract() -> None:
+    sql = FOLDER_HIERARCHY_MIGRATION.read_text()
+
+    assert "add column parent_id uuid" in sql
+    assert "foreign key (parent_id, user_id)" in sql
+    assert "on delete restrict" in sql
+    assert "with recursive ancestors" in sql
+    assert "create trigger folders_parent_integrity" in sql
+    assert "create or replace function bookmark.delete_folder(" in sql
+    assert "security invoker" in sql
+    assert "set search_path = pg_catalog, bookmark" in sql
+    assert (
+        "revoke all on function bookmark.delete_folder(uuid, uuid, uuid) from public"
+        in sql
+    )
+    assert "to authenticated, service_role" in sql
