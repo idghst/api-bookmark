@@ -26,6 +26,7 @@ def test_app_name_is_fixed():
 
 def test_cors_origins_default_to_empty():
     settings = Settings(
+        _env_file=None,
         SUPABASE_URL="https://test.supabase.co",
         SUPABASE_PUBLISHABLE_KEY="sb_publishable_test",
     )
@@ -92,6 +93,7 @@ def test_cors_allows_concrete_origins(cors_origin):
 
 def test_production_disables_docs_by_default():
     settings = Settings(
+        _env_file=None,
         APP_ENV="production",
         SUPABASE_URL="https://test.supabase.co",
         SUPABASE_PUBLISHABLE_KEY="sb_publishable_test",

@@ -69,7 +69,7 @@ Python 3.12와 `uv`가 필요합니다.
 
 ```bash
 uv sync --locked --dev
-cp .env.example .env
+cp .env.example .env.local
 uv run uvicorn app.main:app --reload
 ```
 
