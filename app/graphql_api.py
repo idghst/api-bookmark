@@ -93,6 +93,7 @@ class Folder:
 class Section:
     id: strawberry.ID
     name: str
+    color: str | None
     folder_id: strawberry.ID
     position: int
 
@@ -101,6 +102,7 @@ class Section:
         return cls(
             id=strawberry.ID(model.id),
             name=model.name,
+            color=model.color,
             folder_id=strawberry.ID(model.folder_id),
             position=model.position,
         )
@@ -145,11 +147,13 @@ class FolderUpdateInput:
 class SectionCreateInput:
     folder_id: strawberry.ID
     name: str
+    color: str | None = None
 
 
 @strawberry.input
 class SectionUpdateInput:
     name: str | None = strawberry.UNSET
+    color: str | None = strawberry.UNSET
 
 
 @strawberry.input
@@ -302,7 +306,11 @@ class Mutation:
     ) -> Section:
         row = await _resolve(
             bookmarks.create_section(
-                SectionCreate(folderId=input.folder_id, name=input.name),
+                SectionCreate(
+                    folderId=input.folder_id,
+                    name=input.name,
+                    color=input.color,
+                ),
                 info.context.auth,
             )
         )

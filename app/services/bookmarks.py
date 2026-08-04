@@ -389,6 +389,7 @@ async def create_section(
     row: dict[str, Any] = {
         "id": str(uuid4()),
         "name": payload.name,
+        "color": payload.color,
         "folder_id": payload.folder_id,
         "position": await _next_position(
             auth,

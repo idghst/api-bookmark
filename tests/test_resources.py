@@ -37,6 +37,7 @@ FOLDER = {
 SECTION = {
     "id": "section-1",
     "name": "Reading",
+    "color": None,
     "folder_id": "folder-1",
     "position": 0,
     "user_id": "user-123",
@@ -304,6 +305,22 @@ def test_folder_creation_preserves_color() -> None:
     assert fake.queries[1].payload["color"] == "#123456"
 
 
+def test_section_creation_preserves_color() -> None:
+    section = {**SECTION, "color": "#db2777"}
+    fake = FakeSupabase([], [section])
+
+    response = _client(fake).post(
+        "/api/sections",
+        json={"name": "Reading", "folderId": "folder-1", "color": "#db2777"},
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["color"] == "#db2777"
+    assert isinstance(fake.queries[1].payload, dict)
+    assert fake.queries[1].payload["color"] == "#db2777"
+
+
 def test_folder_creation_scopes_position_to_its_parent() -> None:
     child = {**FOLDER, "id": "folder-2", "parent_id": "folder-1"}
     fake = FakeSupabase([FOLDER], [], [child])
@@ -413,6 +430,44 @@ def test_updates_are_user_scoped(
     assert fake.queries[0].table == table
     assert ("id", path.rsplit("/", 1)[-1]) in fake.queries[0].filters
     _assert_user_scoped(fake.queries[0])
+
+
+@pytest.mark.parametrize("color", ["#2166d7", None])
+def test_section_update_preserves_color(color: str | None) -> None:
+    section = {**SECTION, "color": color}
+    fake = FakeSupabase([section])
+
+    response = _client(fake).patch(
+        "/api/sections/section-1",
+        json={"color": color},
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["color"] == color
+    assert fake.queries[0].payload["color"] == color
+
+
+def test_section_list_returns_color() -> None:
+    section = {**SECTION, "color": "#16a34a"}
+    fake = FakeSupabase([section])
+
+    response = _client(fake).get(
+        "/api/sections",
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "id": "section-1",
+            "name": "Reading",
+            "color": "#16a34a",
+            "folderId": "folder-1",
+            "position": 0,
+            "userId": "user-123",
+        }
+    ]
 
 
 @pytest.mark.parametrize(
@@ -555,7 +610,8 @@ def test_invalid_database_payload_is_sanitized() -> None:
 
 
 def test_graphql_lists_share_the_rest_data_and_user_scope() -> None:
-    fake = FakeSupabase([BOOKMARK], [FOLDER], [SECTION])
+    section = {**SECTION, "color": "#16a34a"}
+    fake = FakeSupabase([BOOKMARK], [FOLDER], [section])
 
     response = _client(fake).post(
         "/graphql",
@@ -566,7 +622,7 @@ def test_graphql_lists_share_the_rest_data_and_user_scope() -> None:
                     id title url description isFavorite folderId sectionId position
                   }
                   folders { id name color position }
-                  sections { id name folderId position }
+                  sections { id name color folderId position }
                 }
             """
         },
@@ -600,6 +656,7 @@ def test_graphql_lists_share_the_rest_data_and_user_scope() -> None:
                 {
                     "id": "section-1",
                     "name": "Reading",
+                    "color": "#16a34a",
                     "folderId": "folder-1",
                     "position": 0,
                 }
@@ -670,7 +727,12 @@ def test_graphql_bookmark_mutations_share_rest_crud_and_user_scope() -> None:
 
 def test_graphql_folder_and_section_mutations_share_rest_crud() -> None:
     updated_folder = {**FOLDER, "name": "Updated"}
-    updated_section = {**SECTION, "name": "Updated section"}
+    created_section = {**SECTION, "color": "#db2777"}
+    updated_section = {
+        **SECTION,
+        "name": "Updated section",
+        "color": "#2166d7",
+    }
     fake = FakeSupabase(
         [],
         [FOLDER],
@@ -678,7 +740,7 @@ def test_graphql_folder_and_section_mutations_share_rest_crud() -> None:
         [{"id": "folder-1"}],
         [{"id": "folder-1"}],
         [],
-        [SECTION],
+        [created_section],
         [updated_section],
         [{"id": "section-1"}],
         [{"id": "section-1"}],
@@ -701,12 +763,16 @@ def test_graphql_folder_and_section_mutations_share_rest_crud() -> None:
                     input: [{ id: "folder-1", position: 1 }]
                   )
                   createdSection: createSection(
-                    input: { folderId: "folder-1", name: "Reading" }
-                  ) { id name folderId position }
+                    input: {
+                      folderId: "folder-1"
+                      name: "Reading"
+                      color: "#db2777"
+                    }
+                  ) { id name color folderId position }
                   updatedSection: updateSection(
                     id: "section-1"
-                    input: { name: "Updated section" }
-                  ) { id name }
+                    input: { name: "Updated section", color: "#2166d7" }
+                  ) { id name color }
                   deletedSection: deleteSection(id: "section-1")
                   reorderedSections: reorderSections(
                     input: [{ id: "section-1", position: 2 }]
@@ -732,10 +798,15 @@ def test_graphql_folder_and_section_mutations_share_rest_crud() -> None:
             "createdSection": {
                 "id": "section-1",
                 "name": "Reading",
+                "color": "#db2777",
                 "folderId": "folder-1",
                 "position": 0,
             },
-            "updatedSection": {"id": "section-1", "name": "Updated section"},
+            "updatedSection": {
+                "id": "section-1",
+                "name": "Updated section",
+                "color": "#2166d7",
+            },
             "deletedSection": True,
             "reorderedSections": True,
         }
@@ -745,7 +816,9 @@ def test_graphql_folder_and_section_mutations_share_rest_crud() -> None:
         ("folder_id", "folder-1"),
     ]
     assert fake.queries[6].payload["user_id"] == "user-123"
+    assert fake.queries[6].payload["color"] == "#db2777"
     assert fake.queries[7].payload["name"] == "Updated section"
+    assert fake.queries[7].payload["color"] == "#2166d7"
     _assert_user_scoped(fake.queries[7])
 
 

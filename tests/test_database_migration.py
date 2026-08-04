@@ -12,6 +12,12 @@ FOLDER_HIERARCHY_MIGRATION = (
     / "migrations"
     / "20260802195716_folder_hierarchy.sql"
 )
+SECTION_COLOR_MIGRATION = (
+    Path(__file__).parent.parent
+    / "supabase"
+    / "migrations"
+    / "20260804222840_add_section_color.sql"
+)
 
 
 def test_resource_migration_creates_expected_tables() -> None:
@@ -51,3 +57,9 @@ def test_folder_hierarchy_migration_enforces_safe_tree_and_delete_contract() -> 
         in sql
     )
     assert "to authenticated, service_role" in sql
+
+
+def test_section_color_migration_adds_nullable_color_column() -> None:
+    assert SECTION_COLOR_MIGRATION.read_text() == (
+        "alter table bookmark.sections\n  add column color text;\n"
+    )

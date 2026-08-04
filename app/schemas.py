@@ -80,6 +80,7 @@ class FolderTreeOut(FolderOut):
 class SectionOut(BaseModel):
     id: str
     name: str
+    color: str | None = None
     folder_id: str = Field(serialization_alias="folderId")
     position: int = 0
     user_id: str = Field(serialization_alias="userId")
@@ -89,6 +90,7 @@ class SectionOut(BaseModel):
 
 class SectionCreate(BaseModel):
     name: str
+    color: str | None = None
     folder_id: str = Field(alias="folderId")
 
     model_config = ConfigDict(populate_by_name=True)
@@ -96,6 +98,7 @@ class SectionCreate(BaseModel):
 
 class SectionUpdate(BaseModel):
     name: str | None = None
+    color: str | None = None
 
 
 class PositionUpdate(BaseModel):
