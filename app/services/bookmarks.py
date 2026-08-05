@@ -410,6 +410,27 @@ async def update_section(
     auth: AuthContext,
 ) -> SectionOut:
     updates = payload.model_dump(exclude_unset=True)
+    destination_folder_id = updates.pop("folder_id", None)
+
+    if "folder_id" in payload.model_fields_set:
+        if not isinstance(destination_folder_id, str) or not destination_folder_id:
+            raise ApiError(422, "section_folder_invalid", "Section folder is invalid")
+        rows = await _execute(
+            auth.client.rpc(
+                "move_section",
+                {
+                    "p_section_id": section_id,
+                    "p_destination_folder_id": destination_folder_id,
+                    "p_user_id": auth.user.id,
+                    "p_name": updates.get("name"),
+                    "p_color": updates.get("color"),
+                    "p_update_name": "name" in updates,
+                    "p_update_color": "color" in updates,
+                },
+            )
+        )
+        return SectionOut(**_ensure_row(rows, "Section"))
+
     updates["updated_at"] = _now()
     rows = await _execute(
         auth.client.table(TABLES["sections"])

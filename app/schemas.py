@@ -99,6 +99,15 @@ class SectionCreate(BaseModel):
 class SectionUpdate(BaseModel):
     name: str | None = None
     color: str | None = None
+    folder_id: str | None = Field(default=None, alias="folderId")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @model_validator(mode="after")
+    def folder_cannot_be_null(self) -> "SectionUpdate":
+        if "folder_id" in self.model_fields_set and self.folder_id is None:
+            raise ValueError("folderId cannot be null")
+        return self
 
 
 class PositionUpdate(BaseModel):

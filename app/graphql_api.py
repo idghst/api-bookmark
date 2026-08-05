@@ -154,6 +154,7 @@ class SectionCreateInput:
 class SectionUpdateInput:
     name: str | None = strawberry.UNSET
     color: str | None = strawberry.UNSET
+    folder_id: strawberry.ID | None = strawberry.UNSET
 
 
 @strawberry.input

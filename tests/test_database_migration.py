@@ -18,6 +18,12 @@ SECTION_COLOR_MIGRATION = (
     / "migrations"
     / "20260804222840_add_section_color.sql"
 )
+SECTION_MOVE_MIGRATION = (
+    Path(__file__).parent.parent
+    / "supabase"
+    / "migrations"
+    / "20260805093016_move_section_with_bookmarks.sql"
+)
 
 
 def test_resource_migration_creates_expected_tables() -> None:
@@ -63,3 +69,24 @@ def test_section_color_migration_adds_nullable_color_column() -> None:
     assert SECTION_COLOR_MIGRATION.read_text() == (
         "alter table bookmark.sections\n  add column color text;\n"
     )
+
+
+def test_section_move_migration_moves_linked_bookmarks_atomically() -> None:
+    sql = SECTION_MOVE_MIGRATION.read_text()
+
+    assert "create or replace function bookmark.move_section(" in sql
+    assert "security invoker" in sql
+    assert "set search_path = pg_catalog, bookmark" in sql
+    assert "update bookmark.sections as section" in sql
+    assert "update bookmark.items as item" in sql
+    assert "where item.section_id = p_section_id" in sql
+    assert "set folder_id = p_destination_folder_id" in sql
+    assert "name = case when p_update_name then p_name else section.name end" in sql
+    assert "color = case when p_update_color then p_color else section.color end" in sql
+    assert "coalesce(max(section.position) + 1, 0)" in sql
+    assert (
+        "revoke all on function bookmark.move_section(\n"
+        "  uuid, uuid, uuid, text, text, boolean, boolean\n"
+        ") from public" in sql
+    )
+    assert "to authenticated, service_role" in sql

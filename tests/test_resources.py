@@ -448,6 +448,83 @@ def test_section_update_preserves_color(color: str | None) -> None:
     assert fake.queries[0].payload["color"] == color
 
 
+def test_section_move_uses_atomic_rpc_and_returns_moved_section() -> None:
+    moved_section = {**SECTION, "folder_id": "folder-2", "position": 3}
+    fake = FakeSupabase([moved_section])
+
+    response = _client(fake).patch(
+        "/api/sections/section-1",
+        json={"folderId": "folder-2"},
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["folderId"] == "folder-2"
+    assert response.json()["position"] == 3
+    assert len(fake.queries) == 1
+    assert fake.queries[0].table == "rpc:move_section"
+    assert fake.queries[0].payload == {
+        "p_section_id": "section-1",
+        "p_destination_folder_id": "folder-2",
+        "p_user_id": "user-123",
+        "p_name": None,
+        "p_color": None,
+        "p_update_name": False,
+        "p_update_color": False,
+    }
+
+
+def test_section_move_updates_name_and_color_in_the_same_rpc() -> None:
+    moved_section = {
+        **SECTION,
+        "folder_id": "folder-2",
+        "position": 3,
+        "name": "Updated reading",
+        "color": "#2166d7",
+    }
+    fake = FakeSupabase([moved_section])
+
+    response = _client(fake).patch(
+        "/api/sections/section-1",
+        json={
+            "folderId": "folder-2",
+            "name": "Updated reading",
+            "color": "#2166d7",
+        },
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["folderId"] == "folder-2"
+    assert response.json()["name"] == "Updated reading"
+    assert response.json()["color"] == "#2166d7"
+    assert len(fake.queries) == 1
+    assert fake.queries[0].table == "rpc:move_section"
+    assert fake.queries[0].payload == {
+        "p_section_id": "section-1",
+        "p_destination_folder_id": "folder-2",
+        "p_user_id": "user-123",
+        "p_name": "Updated reading",
+        "p_color": "#2166d7",
+        "p_update_name": True,
+        "p_update_color": True,
+    }
+
+
+def test_section_move_rejects_null_folder() -> None:
+    fake = FakeSupabase()
+
+    response = _client(fake).patch(
+        "/api/sections/section-1",
+        json={"folderId": None},
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
+    assert fake.queries == []
+
+
 def test_section_list_returns_color() -> None:
     section = {**SECTION, "color": "#16a34a"}
     fake = FakeSupabase([section])
@@ -820,6 +897,48 @@ def test_graphql_folder_and_section_mutations_share_rest_crud() -> None:
     assert fake.queries[7].payload["name"] == "Updated section"
     assert fake.queries[7].payload["color"] == "#2166d7"
     _assert_user_scoped(fake.queries[7])
+
+
+def test_graphql_section_move_uses_atomic_rpc() -> None:
+    moved_section = {**SECTION, "folder_id": "folder-2", "position": 3}
+    fake = FakeSupabase([moved_section])
+
+    response = _client(fake).post(
+        "/graphql",
+        json={
+            "query": """
+                mutation {
+                  moved: updateSection(
+                    id: "section-1"
+                    input: { folderId: "folder-2" }
+                  ) { id folderId position }
+                }
+            """
+        },
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "data": {
+            "moved": {
+                "id": "section-1",
+                "folderId": "folder-2",
+                "position": 3,
+            }
+        }
+    }
+    assert len(fake.queries) == 1
+    assert fake.queries[0].table == "rpc:move_section"
+    assert fake.queries[0].payload == {
+        "p_section_id": "section-1",
+        "p_destination_folder_id": "folder-2",
+        "p_user_id": "user-123",
+        "p_name": None,
+        "p_color": None,
+        "p_update_name": False,
+        "p_update_color": False,
+    }
 
 
 def test_graphql_folder_hierarchy_fields_share_rest_contract() -> None:
