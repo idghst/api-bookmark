@@ -619,6 +619,31 @@ def test_reorders_are_user_scoped(path: str, table: str) -> None:
     assert all(("user_id", "user-123") in query.filters for query in fake.queries)
 
 
+@pytest.mark.parametrize(
+    ("path", "resource_name"),
+    [
+        ("/api/bookmarks/reorder", "Bookmark"),
+        ("/api/folders/reorder", "Folder"),
+        ("/api/sections/reorder", "Section"),
+    ],
+)
+def test_reorder_missing_resource_uses_stable_404(
+    path: str, resource_name: str
+) -> None:
+    response = _client(FakeSupabase([])).post(
+        path,
+        json=[{"id": "missing", "position": 0}],
+        headers={"Authorization": "Bearer test", "X-Request-ID": "req-reorder-missing"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "resource_not_found",
+        "message": f"{resource_name} not found",
+        "request_id": "req-reorder-missing",
+    }
+
+
 def test_missing_resource_uses_stable_404() -> None:
     response = _client(FakeSupabase([])).delete(
         "/api/bookmarks/missing",
@@ -1002,6 +1027,35 @@ def test_graphql_maps_missing_rows_to_not_found() -> None:
         "message": "Bookmark not found",
         "path": ["deleteBookmark"],
         "extensions": {"code": "NOT_FOUND"},
+    }
+
+
+def test_graphql_maps_validation_errors_to_bad_user_input() -> None:
+    response = _client(FakeSupabase([FOLDER])).post(
+        "/graphql",
+        json={
+            "query": """
+                mutation {
+                  updateFolder(
+                    id: "folder-1"
+                    input: { parentId: "folder-1" }
+                  ) { id }
+                }
+            """
+        },
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 200
+    error = response.json()["errors"][0]
+    assert {
+        "message": error["message"],
+        "path": error["path"],
+        "extensions": error["extensions"],
+    } == {
+        "message": "A folder cannot be its own parent",
+        "path": ["updateFolder"],
+        "extensions": {"code": "BAD_USER_INPUT"},
     }
 
 

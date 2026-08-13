@@ -26,6 +26,11 @@ TABLES = {
     "folders": "folders",
     "sections": "sections",
 }
+RESOURCE_NAMES = {
+    TABLES["bookmarks"]: "Bookmark",
+    TABLES["folders"]: "Folder",
+    TABLES["sections"]: "Section",
+}
 
 
 def _now() -> str:
@@ -467,10 +472,11 @@ async def _reorder(
 ) -> None:
     now = _now()
     for item in payload:
-        await _execute(
+        rows = await _execute(
             auth.client.table(table)
             .update({"position": item.position, "updated_at": now})
             .eq("id", item.id)
             .eq("user_id", auth.user.id)
             .select("id")
         )
+        _ensure_row(rows, RESOURCE_NAMES[table])

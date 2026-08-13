@@ -34,6 +34,16 @@ def test_cors_origins_default_to_empty():
     assert settings.CORS_ORIGINS == []
 
 
+def test_pytest_environment_ignores_local_runtime_settings():
+    settings = Settings()
+
+    assert settings.APP_ENV == "test"
+    assert settings.ENABLE_DOCS is False
+    assert settings.SUPABASE_TIMEOUT_SECONDS == 5.0
+    assert settings.SUPABASE_SECRET_KEY is None
+    assert settings.BOOKMARK_API_KEY is None
+
+
 def test_cors_wildcard_is_rejected():
     with pytest.raises(ValidationError):
         Settings(

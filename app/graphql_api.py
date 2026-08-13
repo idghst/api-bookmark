@@ -387,6 +387,7 @@ async def _resolve[T](awaitable: Awaitable[T]) -> T:
         codes = {
             400: "BAD_USER_INPUT",
             401: "UNAUTHENTICATED",
+            422: "BAD_USER_INPUT",
             403: "FORBIDDEN",
             404: "NOT_FOUND",
             409: "CONFLICT",
