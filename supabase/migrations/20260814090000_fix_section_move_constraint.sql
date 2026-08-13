@@ -1,3 +1,6 @@
+alter table bookmark.items
+  alter constraint items_section_owner_fkey deferrable initially immediate;
+
 create or replace function bookmark.move_section(
   p_section_id uuid,
   p_destination_folder_id uuid,
@@ -24,6 +27,8 @@ declare
   target_position integer;
   moved_section bookmark.sections%rowtype;
 begin
+  set constraints items_section_owner_fkey deferred;
+
   if p_user_id is null then
     raise exception using errcode = '22004', message = 'A section owner is required';
   end if;

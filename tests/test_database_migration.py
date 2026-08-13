@@ -24,6 +24,12 @@ SECTION_MOVE_MIGRATION = (
     / "migrations"
     / "20260805093016_move_section_with_bookmarks.sql"
 )
+SECTION_MOVE_CONSTRAINT_FIX_MIGRATION = (
+    Path(__file__).parent.parent
+    / "supabase"
+    / "migrations"
+    / "20260814090000_fix_section_move_constraint.sql"
+)
 
 
 def test_resource_migration_creates_expected_tables() -> None:
@@ -77,6 +83,7 @@ def test_section_move_migration_moves_linked_bookmarks_atomically() -> None:
     assert "create or replace function bookmark.move_section(" in sql
     assert "security invoker" in sql
     assert "set search_path = pg_catalog, bookmark" in sql
+    assert '"position" integer' in sql
     assert "update bookmark.sections as section" in sql
     assert "update bookmark.items as item" in sql
     assert "where item.section_id = p_section_id" in sql
@@ -89,4 +96,18 @@ def test_section_move_migration_moves_linked_bookmarks_atomically() -> None:
         "  uuid, uuid, uuid, text, text, boolean, boolean\n"
         ") from public" in sql
     )
+    assert "to authenticated, service_role" in sql
+
+
+def test_section_move_constraint_fix_defers_linked_bookmark_foreign_key() -> None:
+    sql = SECTION_MOVE_CONSTRAINT_FIX_MIGRATION.read_text()
+
+    assert (
+        "alter constraint items_section_owner_fkey deferrable initially immediate"
+        in sql
+    )
+    assert "set constraints items_section_owner_fkey deferred" in sql
+    assert "create or replace function bookmark.move_section(" in sql
+    assert '"position" integer' in sql
+    assert "security invoker" in sql
     assert "to authenticated, service_role" in sql
