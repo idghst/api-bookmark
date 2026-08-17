@@ -1,6 +1,11 @@
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+class AuthMeOut(BaseModel):
+    id: str
+    email: str | None
+
+
 class BookmarkOut(BaseModel):
     id: str
     title: str
