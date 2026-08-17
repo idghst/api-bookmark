@@ -8,6 +8,12 @@
 - 멀티 에이전트는 저장소와 레인을 나눠 동시에 일한다. 맡은 저장소·레인 밖은 읽기만 하고 수정하지 않는다.
 - 형제 저장소 `bookmark`의 웹 BFF(`app/lib/bookmarks/store.ts`)와 모바일 REST 클라이언트(`mobile/src/lib/api.ts`)가 이 API를 소비한다. 계약이 바뀌면 소비자 작업을 같은 턴에 몰래 넣지 말고, 계약 완료 후 별도 에이전트에 넘긴다.
 
+[graphify]
+- 코드 탐색 전에 `graphify query "<질문>"`, `graphify path "<A>" "<B>"`, `graphify explain "<심볼>"`을 먼저 실행한다. 서브에이전트 프롬프트에도 이 규칙을 넣는다.
+- 커뮤니티 의미와 런타임 경로는 `docs/graphify/README.md`를 본다. `GRAPH_REPORT.md`의 Community N 라벨은 코드 전용 추출이라 이름이 없다.
+- FastAPI `Depends`는 호출 엣지가 아닐 수 있다. directed path가 없으면 `--undirected`를 치고, 그래도 비면 문서를 따른다.
+- 코드 구조가 바뀌면 `graphify update .`로 AST 그래프를 갱신한다. `graphify-out/cache/`는 커밋하지 않는다.
+
 [lanes]
 한 레인에는 구현 에이전트를 하나만 둔다. 코디네이터는 디스패치 전에 허용 경로를 배타적으로 할당한다.
 
@@ -15,8 +21,8 @@
 | --- | --- | --- |
 | `platform` | `app/core/`, `app/middleware/`, `app/main.py`, `app/api/router.py`, `app/api/routes/health.py`, `tests/test_config.py`, `tests/test_errors.py`, `tests/test_middleware.py`, `tests/test_health.py`, `vercel.json`, `tests/test_vercel_config.py` | 없음. `app/main.py`를 건드리면 GraphQL 마운트 부분을 유지한다. |
 | `auth` | `app/integrations/`, `app/api/routes/auth.py`, `tests/test_auth.py` | `domain`과 동시에 `app/integrations/supabase.py`를 수정하지 않는다. |
-| `domain` | `app/schemas.py`, `app/services/`, `app/api/routes/resources.py`, `tests/test_resources.py` | `graphql`, `db` |
-| `graphql` | `app/graphql_api.py` | `domain` |
+| `domain` | `app/schemas.py`, `app/services/`, `app/api/routes/resources.py`, `app/api/routes/bookmarks.py`, `app/api/routes/folders.py`, `app/api/routes/sections.py`, `tests/test_resources.py` | `graphql`, `db` |
+| `graphql` | `app/graphql/`, `app/graphql_api.py` | `domain` |
 | `db` | `supabase/`, `tests/test_database_migration.py`, `tests/integration/` | `domain` |
 | `tooling` | `.github/`, `pyproject.toml`, `uv.lock`, `.python-version`, `README.md` | lockfile을 바꾸는 작업은 단독으로 한다. |
 
@@ -27,7 +33,7 @@
 아래는 한 번에 한 에이전트만 변경한다. 변경 후에는 소비자 레인(`bookmark` 웹·모바일)을 순차로 맞춘다.
 
 - REST: `/api/bookmarks`, `/api/folders`, `/api/folders/tree`, `/api/sections`와 각 `reorder`·`PATCH`·`DELETE`
-- GraphQL: `app/graphql_api.py`의 타입·input·쿼리·뮤테이션 이름과 필드
+- GraphQL: `app/graphql/`·`app/graphql_api.py`의 타입·input·쿼리·뮤테이션 이름과 필드
 - 인증: `Authorization: Bearer <Supabase JWT>` 또는 `X-Bookmark-Key` (`BOOKMARK_API_KEY`)
 - 오류 봉투: `{ "code", "message", "request_id" }`와 HTTP 상태. 코드 문자열을 바꾸지 않는다.
 - 직렬화 별칭: `isFavorite`, `folderId`, `sectionId`, `parentId`, `createdAt`, `updatedAt`, `userId`
@@ -37,7 +43,7 @@
 [parallel]
 - 서로 다른 레인의 독립 작업만 동시에 실행한다. 같은 파일을 두 에이전트가 열지 않는다.
 - 계약·스키마·GraphQL·REST 경로 변경은 병렬 금지. `domain` 또는 `graphql` 또는 `db`가 끝난 뒤에 소비자를 돌린다.
-- 핫스팟(항상 단독): `app/graphql_api.py`, `app/services/bookmarks.py`, `app/schemas.py`, `app/api/routes/resources.py`, `app/integrations/supabase.py`
+- 핫스팟(항상 단독): `app/graphql/`, `app/graphql_api.py`, `app/services/bookmarks.py`, `app/schemas.py`, `app/api/routes/resources.py`, `app/integrations/supabase.py`
 - 포맷/임포트 정리, lockfile 갱신, 전역 리네임은 병렬 세션에서 하지 않는다.
 - 다른 에이전트 파일을 재포맷하거나 요청 밖 리팩터를 하지 않는다.
 
