@@ -1,0 +1,1683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>api-bookmark — Complete Call Flow &amp; Architecture Documentation</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+:root {
+  --bg: #0f172a; --surface: #1e293b; --border: #334155;
+  --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8;
+  --warn: #fbbf24; --err: #f87171; --ok: #34d399;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }
+.container { max-width: 1200px; margin: 0 auto; padding: 40px 24px; }
+h1 { font-size: 2.4rem; margin-bottom: 8px; background: linear-gradient(135deg, var(--accent), #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+h2 { font-size: 1.7rem; margin: 48px 0 16px; padding-bottom: 8px; border-bottom: 2px solid var(--accent); }
+h3 { font-size: 1.25rem; margin: 32px 0 12px; color: var(--accent); }
+h4 { font-size: 1.05rem; margin: 20px 0 8px; color: var(--warn); }
+p { margin: 8px 0; color: var(--muted); }
+.subtitle { color: var(--muted); font-size: 1.1rem; margin-bottom: 32px; }
+.mermaid { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 20px 0; overflow-x: auto; position: relative; }
+.mermaid.is-enhanced { padding: 0; overflow: hidden; min-height: 260px; }
+.mermaid-viewport { padding: 54px 24px 24px; overflow: hidden; cursor: grab; touch-action: none; min-height: 260px; }
+.mermaid-viewport.is-dragging { cursor: grabbing; }
+.mermaid-viewport svg { max-width: none !important; height: auto; transform-origin: 0 0; transition: transform 120ms ease; }
+.mermaid-toolbar { position: absolute; top: 10px; right: 10px; z-index: 3; display: flex; align-items: center; gap: 6px; padding: 6px; background: rgba(15,23,42,0.92); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.28); }
+.mermaid-toolbar button, .mermaid-toolbar .zoom-level { height: 28px; min-width: 32px; border: 1px solid var(--border); border-radius: 6px; background: #1e293b; color: var(--text); font: 600 0.78rem system-ui, sans-serif; display: inline-flex; align-items: center; justify-content: center; }
+.mermaid-toolbar button { cursor: pointer; }
+.mermaid-toolbar button:hover { border-color: var(--accent); color: var(--accent); }
+.mermaid-toolbar .zoom-level { min-width: 52px; color: var(--muted); background: transparent; }
+.call-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.92rem; }
+.call-table th { background: #1a2744; color: var(--accent); text-align: left; padding: 10px 14px; border: 1px solid var(--border); }
+.call-table td { padding: 8px 14px; border: 1px solid var(--border); vertical-align: top; }
+.call-table tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+.tag-async { background: #7c3aed33; color: #a78bfa; }
+.tag-class { background: #05966933; color: var(--ok); }
+.tag-func { background: #2563eb33; color: var(--accent); }
+.tag-cmd { background: #d9770633; color: var(--warn); }
+.tag-endpoint { background: #dc262633; color: var(--err); }
+.tag-hook { background: #db277733; color: #f472b6; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin: 16px 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin: 16px 0; }
+.arrow-chain { font-family: 'Fira Code', monospace; font-size: 0.85rem; color: var(--accent); padding: 10px; background: rgba(56,189,248,0.06); border-radius: 6px; }
+code { font-family: 'Fira Code', 'Cascadia Code', monospace; background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 3px; font-size: 0.88em; }
+ul, ol { margin: 8px 0 8px 24px; color: var(--muted); }
+li { margin: 4px 0; }
+a { color: var(--accent); }
+hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+.nav { position: sticky; top: 0; background: var(--bg); z-index: 10; padding: 12px 0; border-bottom: 1px solid var(--border); display: flex; gap: 20px; flex-wrap: wrap; font-size: 0.9rem; }
+.nav a { text-decoration: none; }
+.nav a:hover { text-decoration: underline; }
+@media (max-width: 768px) { .container { padding: 16px; } h1 { font-size: 1.8rem; } }
+
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>api-bookmark — Complete Call Flow &amp; Architecture Documentation</h1>
+<p class="subtitle">Generated from graphify knowledge graph: 396 nodes, 1129 edges, 20 communities. Commit: 114bee9</p>
+
+<div class="nav">
+    <a href="#overview">Architecture Overview</a>
+    <a href="#build-graph">Graph Build</a>
+    <a href="#serve-api">Serving API</a>
+    <a href="#tests-fixtures">Tests &amp; Fixtures</a>
+    <a href="#app-application-configuration">App Application Configuration</a>
+    <a href="#integrations-app-external">Integrations App External</a>
+    <a href="#app">App</a>
+    <a href="#middleware-app">Middleware App</a>
+    <a href="#fastapi-bookmark-pyprojecttoml">Fastapi Bookmark Pyprojecttoml</a>
+</div>
+
+<!-- ====== Architecture Overview ====== -->
+<h2 id="overview">1. Architecture Overview</h2>
+
+<div class="mermaid">
+
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    BUILD_GRAPH_321CBB04("Graph Build<br/><small>59 nodes</small>")
+    class BUILD_GRAPH_321CBB04 module;
+    SERVE_API_35EC8E86("Serving API<br/><small>98 nodes</small>")
+    class SERVE_API_35EC8E86 module;
+    TESTS_FIXTURES_B84B1DCC("Tests &amp; Fixtures<br/><small>232 nodes</small>")
+    class TESTS_FIXTURES_B84B1DCC module;
+    APP_APPLICATION_CONFIGURATION_255D370D("App Application Configuration<br/><small>2 nodes</small>")
+    class APP_APPLICATION_CONFIGURATION_255D370D module;
+    INTEGRATIONS_APP_EXTERNAL_0037F08F("Integrations App External<br/><small>2 nodes</small>")
+    class INTEGRATIONS_APP_EXTERNAL_0037F08F module;
+    APP_7D104347("App<br/><small>1 nodes</small>")
+    class APP_7D104347 module;
+    MIDDLEWARE_APP_1A1237A1("Middleware App<br/><small>1 nodes</small>")
+    class MIDDLEWARE_APP_1A1237A1 module;
+    FASTAPI_BOOKMARK_PYPROJECTTOML_E6924A10("Fastapi Bookmark Pyprojecttoml<br/><small>1 nodes</small>")
+    class FASTAPI_BOOKMARK_PYPROJECTTOML_E6924A10 module;
+    BUILD_GRAPH_321CBB04 -->|imports x27| SERVE_API_35EC8E86
+    TESTS_FIXTURES_B84B1DCC -->|imports x18| SERVE_API_35EC8E86
+    SERVE_API_35EC8E86 -->|imports x15| TESTS_FIXTURES_B84B1DCC
+    BUILD_GRAPH_321CBB04 -->|references x2| TESTS_FIXTURES_B84B1DCC
+    TESTS_FIXTURES_B84B1DCC -->|imports| BUILD_GRAPH_321CBB04
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h4>Architecture Layers</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>Layer</th><th>Nodes</th><th>Communities</th></tr>
+      <tr><td>Graph Build</td><td>59</td><td><code>3, 9</code></td></tr><tr><td>Serving API</td><td>98</td><td><code>2, 4, 14, 15</code></td></tr><tr><td>Tests &amp; Fixtures</td><td>232</td><td><code>0, 1, 5, 6, 7, 8, 10, 13, 19</code></td></tr><tr><td>App Application Configuration</td><td>2</td><td><code>11</code></td></tr><tr><td>Integrations App External</td><td>2</td><td><code>12</code></td></tr><tr><td>App</td><td>1</td><td><code>16</code></td></tr><tr><td>Middleware App</td><td>1</td><td><code>17</code></td></tr><tr><td>Fastapi Bookmark Pyprojecttoml</td><td>1</td><td><code>18</code></td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Core Flow</h4>
+    <div class="arrow-chain">App Application Configuration -&gt; Graph Build -&gt; Serving API -&gt; Tests &amp; Fixtures -&gt; Integrations App External -&gt; App -&gt; Middleware App</div>
+  </div>
+</div>
+<div class="grid">
+  <div class="card">
+    <h4>Graph Report Highlights</h4>
+    <ul>
+      <li>396 nodes · 1129 edges · 20 communities (16 shown, 4 thin omitted)</li>
+      <li>Extraction: 86% EXTRACTED · 14% INFERRED · 0% AMBIGUOUS · INFERRED: 156 edges (avg confidence: 0.52)</li>
+      <li>Token cost: 0 input · 0 output</li>
+      <li>1. `Settings` - 56 edges</li>
+      <li>2. `AuthContext` - 40 edges</li>
+      <li>3. `FakeSupabase` - 35 edges</li>
+    </ul>
+  </div>
+</div>
+<hr>
+<!-- ====== 2. Graph Build ====== -->
+<h2 id="build-graph">2. Graph Build</h2>
+<p>Graph Build groups implementation around graphql, app, schemapy, inputspy, mostly in app/graphql/schema.py, app/graphql/inputs.py, app/graphql/types.py. This section covers 59 nodes and 185 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Graph Build (59 nodes, 185 edges)
+    subgraph build_graph_app_graphql_schema_py_120d6ef5["app/graphql/schema.py"]
+        app_graphql_schema_24abe6c3("schema.py")
+        app_graphql_schema_query_2f7e05d9("Query<br/><small>app/graphql/schema.py</small>")
+        app_graphql_schema_mutation_update_bookmark_57d1e9bd("update_bookmark()<br/><small>app/graphql/schema.py</small>")
+        app_graphql_schema_mutation_update_folder_911273dc("update_folder()<br/><small>app/graphql/schema.py</small>")
+        app_graphql_schema_mutation_update_section_bbca4be7("update_section()<br/><small>app/graphql/schema.py</small>")
+        app_graphql_schema_mutation_create_bookmark_ef839631("create_bookmark()<br/><small>app/graphql/schema.py</small>")
+        app_graphql_schema_query_status_d98f27f0("status()<br/><small>app/graphql/schema.py</small>")
+        app_graphql_schema_query_bookmarks_5738f7fc("bookmarks()<br/><small>app/graphql/schema.py</small>")
+        app_graphql_schema_query_folders_7f12ab98("folders()<br/><small>app/graphql/schema.py</small>")
+        app_graphql_schema_query_sections_1626c64f("sections()<br/><small>app/graphql/schema.py</small>")
+    end
+    subgraph build_graph_app_graphql_types_py_91970678["app/graphql/types.py"]
+        app_graphql_types_bookmark_b3a98738("Bookmark<br/><small>app/graphql/types.py</small>")
+        app_graphql_types_bookmark_from_model_37bb2947("from_model()<br/><small>app/graphql/types.py</small>")
+        app_graphql_types_folder_15da1aed("Folder<br/><small>app/graphql/types.py</small>")
+        app_graphql_types_folder_from_model_0fc7c136("from_model()<br/><small>app/graphql/types.py</small>")
+        app_graphql_types_section_6dab3746("Section<br/><small>app/graphql/types.py</small>")
+        app_graphql_types_section_from_model_e3b8563a("from_model()<br/><small>app/graphql/types.py</small>")
+    end
+    subgraph build_graph_app_graphql_context_py_dca4b065["app/graphql/context.py"]
+        app_graphql_context_graphqlcontext_03809c8a("GraphQLContext<br/><small>app/graphql/context.py</small>")
+        app_graphql_context_graphqlcontext_init_8115f44c("__init__()<br/><small>app/graphql/context.py</small>")
+    end
+    app_graphql_context_graphqlcontext_03809c8a -->|method| app_graphql_context_graphqlcontext_init_8115f44c
+    app_graphql_schema_query_2f7e05d9 -->|method| app_graphql_schema_query_status_d98f27f0
+    app_graphql_schema_query_2f7e05d9 -->|method| app_graphql_schema_query_bookmarks_5738f7fc
+    app_graphql_schema_query_2f7e05d9 -->|method| app_graphql_schema_query_folders_7f12ab98
+    app_graphql_schema_query_2f7e05d9 -->|method| app_graphql_schema_query_sections_1626c64f
+    app_graphql_types_bookmark_b3a98738 -->|method| app_graphql_types_bookmark_from_model_37bb2947
+    app_graphql_types_folder_15da1aed -->|method| app_graphql_types_folder_from_model_0fc7c136
+    app_graphql_types_section_6dab3746 -->|method| app_graphql_types_section_from_model_e3b8563a
+    app_graphql_schema_mutation_create_bookmark_ef839631 -->|calls| app_graphql_types_bookmark_from_model_37bb2947
+    app_graphql_schema_mutation_update_bookmark_57d1e9bd -->|calls| app_graphql_types_bookmark_from_model_37bb2947
+    app_graphql_schema_mutation_update_folder_911273dc -->|calls| app_graphql_types_folder_from_model_0fc7c136
+    app_graphql_schema_mutation_update_section_bbca4be7 -->|calls| app_graphql_types_section_from_model_e3b8563a
+    app_graphql_schema_query_bookmarks_5738f7fc -->|calls| app_graphql_types_bookmark_from_model_37bb2947
+    app_graphql_schema_query_folders_7f12ab98 -->|calls| app_graphql_types_folder_from_model_0fc7c136
+    app_graphql_schema_query_sections_1626c64f -->|calls| app_graphql_types_section_from_model_e3b8563a
+    app_graphql_schema_24abe6c3 -->|imports| app_graphql_types_bookmark_b3a98738
+    app_graphql_schema_24abe6c3 -->|imports| app_graphql_types_folder_15da1aed
+    app_graphql_schema_24abe6c3 -->|imports| app_graphql_types_section_6dab3746
+    app_graphql_schema_24abe6c3 -->|imports| app_graphql_context_graphqlcontext_03809c8a
+    %% Omitted for readability: 41 nodes, 0 edges
+    class app_graphql_schema_24abe6c3 module;
+    class app_graphql_schema_query_2f7e05d9 klass;
+    class app_graphql_schema_mutation_update_bookmark_57d1e9bd function;
+    class app_graphql_schema_mutation_update_folder_911273dc function;
+    class app_graphql_schema_mutation_update_section_bbca4be7 function;
+    class app_graphql_schema_mutation_create_bookmark_ef839631 function;
+    class app_graphql_schema_query_status_d98f27f0 function;
+    class app_graphql_schema_query_bookmarks_5738f7fc function;
+    class app_graphql_schema_query_folders_7f12ab98 function;
+    class app_graphql_schema_query_sections_1626c64f function;
+    class app_graphql_types_bookmark_b3a98738 klass;
+    class app_graphql_types_bookmark_from_model_37bb2947 function;
+    class app_graphql_types_folder_15da1aed klass;
+    class app_graphql_types_folder_from_model_0fc7c136 function;
+    class app_graphql_types_section_6dab3746 klass;
+    class app_graphql_types_section_from_model_e3b8563a function;
+    class app_graphql_context_graphqlcontext_03809c8a klass;
+    class app_graphql_context_graphqlcontext_init_8115f44c function;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>GraphQLContext</code><br><small style="color:var(--muted)">app/graphql/context.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>Mutation</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>Query</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>schema.py</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td><code>__init__()</code><br><small style="color:var(--muted)">app/graphql/context.py</small><br><code>AuthContext</code><br><small style="color:var(--muted)">app/integrations/supabase.py</small></td>
+  <td>Builds dependency relationships and graph data.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>BookmarkCreateInput</code><br><small style="color:var(--muted)">app/graphql/inputs.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>Mutation</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>schema.py</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>BookmarkCreateInput node in app/graphql/inputs.py.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>BookmarkUpdateInput</code><br><small style="color:var(--muted)">app/graphql/inputs.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>Mutation</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>schema.py</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>BookmarkUpdateInput node in app/graphql/inputs.py.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><code>FolderCreateInput</code><br><small style="color:var(--muted)">app/graphql/inputs.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>Mutation</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>schema.py</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>FolderCreateInput node in app/graphql/inputs.py.</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><code>FolderUpdateInput</code><br><small style="color:var(--muted)">app/graphql/inputs.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>Mutation</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>schema.py</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>FolderUpdateInput node in app/graphql/inputs.py.</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><code>PositionInput</code><br><small style="color:var(--muted)">app/graphql/inputs.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>errors.py</code><br><small style="color:var(--muted)">app/graphql/errors.py</small><br><code>Mutation</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>positions()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small><br>+1 more</td>
+  <td>No direct outbound edge</td>
+  <td>PositionInput node in app/graphql/inputs.py.</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><code>SectionCreateInput</code><br><small style="color:var(--muted)">app/graphql/inputs.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>Mutation</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>schema.py</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>SectionCreateInput node in app/graphql/inputs.py.</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td><code>SectionUpdateInput</code><br><small style="color:var(--muted)">app/graphql/inputs.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>Mutation</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>schema.py</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>SectionUpdateInput node in app/graphql/inputs.py.</td>
+</tr>
+<tr>
+  <td>9</td>
+  <td><code>Mutation</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>Bookmark</code><br><small style="color:var(--muted)">app/graphql/types.py</small><br><code>BookmarkCreate</code><br><small style="color:var(--muted)">app/schemas.py</small><br><code>BookmarkCreateInput</code><br><small style="color:var(--muted)">app/graphql/inputs.py</small><br>+14 more</td>
+  <td>Mutation node in app/graphql/schema.py.</td>
+</tr>
+<tr>
+  <td>10</td>
+  <td><code>Query</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>Bookmark</code><br><small style="color:var(--muted)">app/graphql/types.py</small><br><code>bookmarks()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>Folder</code><br><small style="color:var(--muted)">app/graphql/types.py</small><br>+5 more</td>
+  <td>Query node in app/graphql/schema.py.</td>
+</tr>
+<tr>
+  <td>11</td>
+  <td><code>Bookmark</code><br><small style="color:var(--muted)">app/graphql/types.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>Mutation</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>Query</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>schema.py</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td><code>BookmarkOut</code><br><small style="color:var(--muted)">app/schemas.py</small><br><code>from_model()</code><br><small style="color:var(--muted)">app/graphql/types.py</small></td>
+  <td>Bookmark node in app/graphql/types.py.</td>
+</tr>
+<tr>
+  <td>12</td>
+  <td><code>Folder</code><br><small style="color:var(--muted)">app/graphql/types.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>Mutation</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>Query</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>schema.py</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td><code>FolderOut</code><br><small style="color:var(--muted)">app/schemas.py</small><br><code>from_model()</code><br><small style="color:var(--muted)">app/graphql/types.py</small></td>
+  <td>Folder node in app/graphql/types.py.</td>
+</tr>
+<tr>
+  <td>13</td>
+  <td><code>Section</code><br><small style="color:var(--muted)">app/graphql/types.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>Mutation</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>Query</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>schema.py</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td><code>from_model()</code><br><small style="color:var(--muted)">app/graphql/types.py</small><br><code>SectionOut</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td>Section node in app/graphql/types.py.</td>
+</tr>
+<tr>
+  <td>14</td>
+  <td><code>get_graphql_context()</code><br><small style="color:var(--muted)">app/graphql/context.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>schema.py</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td><code>AuthContext</code><br><small style="color:var(--muted)">app/integrations/supabase.py</small></td>
+  <td>Builds dependency relationships and graph data.</td>
+</tr>
+<tr>
+  <td>15</td>
+  <td><code>.__init__()</code><br><small style="color:var(--muted)">app/graphql/context.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>GraphQLContext</code><br><small style="color:var(--muted)">app/graphql/context.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.__init__() node in app/graphql/context.py.</td>
+</tr>
+<tr>
+  <td>16</td>
+  <td><code>positions()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>reorder_bookmarks()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>reorder_folders()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>reorder_sections()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br>+1 more</td>
+  <td><code>PositionInput</code><br><small style="color:var(--muted)">app/graphql/inputs.py</small><br><code>PositionUpdate</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td>positions() node in app/graphql/errors.py.</td>
+</tr>
+<tr>
+  <td>17</td>
+  <td><code>resolve()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>bookmarks()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>create_bookmark()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>create_folder()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br>+13 more</td>
+  <td><code>ApiError</code><br><small style="color:var(--muted)">app/core/errors.py</small></td>
+  <td>resolve() node in app/graphql/errors.py.</td>
+</tr>
+<tr>
+  <td>18</td>
+  <td><code>update_values()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>schema.py</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>update_bookmark()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>update_folder()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br>+1 more</td>
+  <td>No direct outbound edge</td>
+  <td>update_values() node in app/graphql/errors.py.</td>
+</tr>
+<tr>
+  <td>19</td>
+  <td><code>.create_bookmark()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>BookmarkCreate</code><br><small style="color:var(--muted)">app/schemas.py</small><br><code>from_model()</code><br><small style="color:var(--muted)">app/graphql/types.py</small><br><code>resolve()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small></td>
+  <td>.create_bookmark() node in app/graphql/schema.py.</td>
+</tr>
+<tr>
+  <td>20</td>
+  <td><code>.create_folder()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>FolderCreate</code><br><small style="color:var(--muted)">app/schemas.py</small><br><code>from_model()</code><br><small style="color:var(--muted)">app/graphql/types.py</small><br><code>resolve()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small></td>
+  <td>.create_folder() node in app/graphql/schema.py.</td>
+</tr>
+<tr>
+  <td>21</td>
+  <td><code>.create_section()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>from_model()</code><br><small style="color:var(--muted)">app/graphql/types.py</small><br><code>resolve()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small><br><code>SectionCreate</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td>.create_section() node in app/graphql/schema.py.</td>
+</tr>
+<tr>
+  <td>22</td>
+  <td><code>.delete_bookmark()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>resolve()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small></td>
+  <td>.delete_bookmark() node in app/graphql/schema.py.</td>
+</tr>
+<tr>
+  <td>23</td>
+  <td><code>.delete_folder()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>resolve()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small></td>
+  <td>.delete_folder() node in app/graphql/schema.py.</td>
+</tr>
+<tr>
+  <td>24</td>
+  <td><code>.delete_section()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>resolve()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small></td>
+  <td>.delete_section() node in app/graphql/schema.py.</td>
+</tr>
+<tr>
+  <td>25</td>
+  <td><code>.reorder_bookmarks()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>positions()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small><br><code>resolve()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small></td>
+  <td>.reorder_bookmarks() node in app/graphql/schema.py.</td>
+</tr>
+<tr>
+  <td>26</td>
+  <td><code>.reorder_folders()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>positions()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small><br><code>resolve()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small></td>
+  <td>.reorder_folders() node in app/graphql/schema.py.</td>
+</tr>
+<tr>
+  <td>27</td>
+  <td><code>.reorder_sections()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>positions()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small><br><code>resolve()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small></td>
+  <td>.reorder_sections() node in app/graphql/schema.py.</td>
+</tr>
+<tr>
+  <td>28</td>
+  <td><code>.update_bookmark()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>from_model()</code><br><small style="color:var(--muted)">app/graphql/types.py</small><br><code>resolve()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small><br><code>update_values()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small></td>
+  <td>.update_bookmark() node in app/graphql/schema.py.</td>
+</tr>
+<tr>
+  <td>29</td>
+  <td><code>.update_folder()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>from_model()</code><br><small style="color:var(--muted)">app/graphql/types.py</small><br><code>resolve()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small><br><code>update_values()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small></td>
+  <td>.update_folder() node in app/graphql/schema.py.</td>
+</tr>
+<tr>
+  <td>30</td>
+  <td><code>.update_section()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>from_model()</code><br><small style="color:var(--muted)">app/graphql/types.py</small><br><code>resolve()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small><br><code>update_values()</code><br><small style="color:var(--muted)">app/graphql/errors.py</small></td>
+  <td>.update_section() node in app/graphql/schema.py.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>app/graphql/schema.py</code></td><td>19 nodes</td></tr>
+<tr><td><code>app/graphql/inputs.py</code></td><td>8 nodes</td></tr>
+<tr><td><code>app/graphql/types.py</code></td><td>7 nodes</td></tr>
+<tr><td><code>vercel.json</code></td><td>7 nodes</td></tr>
+<tr><td><code>app/graphql/context.py</code></td><td>4 nodes</td></tr>
+<tr><td><code>app/graphql/errors.py</code></td><td>4 nodes</td></tr>
+<tr><td><code>app/graphql/__init__.py</code></td><td>1 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: references x85, calls x30, contains x23, imports x16. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 3. Serving API ====== -->
+<h2 id="serve-api">3. Serving API</h2>
+<p>Serving API groups implementation around app, services, routes, api, mostly in app/schemas.py, app/services/folders.py, api/routes/folders.py. This section covers 98 nodes and 338 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Serving API (98 nodes, 338 edges)
+    subgraph serve_api_api_routes_bookmarks_py_c50da6f7["api/routes/bookmarks.py"]
+        app_api_routes_bookmarks_b4196fd7("bookmarks.py")
+        app_api_routes_bookmarks_create_bookmark_4a57eb2f("create_bookmark()<br/><small>api/routes/bookmarks.py</small>")
+        app_api_routes_bookmarks_delete_bookmark_246df347("delete_bookmark()<br/><small>api/routes/bookmarks.py</small>")
+        app_api_routes_bookmarks_list_bookmarks_530b5231("list_bookmarks()<br/><small>api/routes/bookmarks.py</small>")
+    end
+    subgraph serve_api_app_schemas_py_2d85bdbe["app/schemas.py"]
+        app_schemas_folderupdate_885c6723("FolderUpdate<br/><small>app/schemas.py</small>")
+        app_schemas_folderupdate_position_cannot_be_null_40ca4e8b("position_cannot_be_null()<br/><small>app/schemas.py</small>")
+        app_schemas_sectionupdate_55dff910("SectionUpdate<br/><small>app/schemas.py</small>")
+        app_schemas_sectionupdate_folder_cannot_be_null_6d85885f("folder_cannot_be_null()<br/><small>app/schemas.py</small>")
+    end
+    subgraph serve_api_app_services_bookmarks_py_20830077["app/services/bookmarks.py"]
+        app_services_bookmarks_bc794758("bookmarks.py")
+        app_services_bookmarks_create_bookmark_b916fbeb("create_bookmark()<br/><small>app/services/bookmarks.py</small>")
+        app_services_bookmarks_delete_bookmark_fd98a444("delete_bookmark()<br/><small>app/services/bookmarks.py</small>")
+        app_services_bookmarks_list_bookmarks_25b45780("list_bookmarks()<br/><small>app/services/bookmarks.py</small>")
+    end
+    subgraph serve_api_app_core_errors_py_05872893["app/core/errors.py"]
+        app_core_errors_apierror_d5230271("ApiError<br/><small>app/core/errors.py</small>")
+        app_core_errors_apierror_init_48c8d35c("__init__()<br/><small>app/core/errors.py</small>")
+    end
+    app_api_routes_folders_cb1698dd("folders.py")
+    app_api_routes_sections_1c673b55("sections.py")
+    app_services_folders_9a9f9fba("folders.py")
+    app_services_sections_1b6b34bc("sections.py")
+    app_core_errors_apierror_d5230271 -->|method| app_core_errors_apierror_init_48c8d35c
+    app_schemas_folderupdate_885c6723 -->|method| app_schemas_folderupdate_position_cannot_be_null_40ca4e8b
+    app_schemas_sectionupdate_55dff910 -->|method| app_schemas_sectionupdate_folder_cannot_be_null_6d85885f
+    app_api_routes_bookmarks_create_bookmark_4a57eb2f -->|calls| app_services_bookmarks_create_bookmark_b916fbeb
+    app_api_routes_bookmarks_delete_bookmark_246df347 -->|calls| app_services_bookmarks_delete_bookmark_fd98a444
+    app_api_routes_bookmarks_list_bookmarks_530b5231 -->|calls| app_services_bookmarks_list_bookmarks_25b45780
+    app_api_routes_bookmarks_b4196fd7 -->|imports| app_services_bookmarks_bc794758
+    app_api_routes_folders_cb1698dd -->|imports| app_schemas_folderupdate_885c6723
+    app_api_routes_folders_cb1698dd -->|imports| app_services_folders_9a9f9fba
+    app_api_routes_sections_1c673b55 -->|imports| app_schemas_sectionupdate_55dff910
+    app_api_routes_sections_1c673b55 -->|imports| app_services_sections_1b6b34bc
+    app_services_bookmarks_bc794758 -->|imports| app_services_sections_1b6b34bc
+    app_services_bookmarks_bc794758 -->|imports| app_services_folders_9a9f9fba
+    app_services_folders_9a9f9fba -->|imports| app_core_errors_apierror_d5230271
+    app_services_folders_9a9f9fba -->|imports| app_schemas_folderupdate_885c6723
+    app_services_sections_1b6b34bc -->|imports| app_core_errors_apierror_d5230271
+    app_services_sections_1b6b34bc -->|imports| app_schemas_sectionupdate_55dff910
+    %% Omitted for readability: 80 nodes, 0 edges
+    class app_api_routes_bookmarks_b4196fd7 api;
+    class app_api_routes_bookmarks_create_bookmark_4a57eb2f function;
+    class app_api_routes_bookmarks_delete_bookmark_246df347 function;
+    class app_api_routes_bookmarks_list_bookmarks_530b5231 function;
+    class app_schemas_folderupdate_885c6723 klass;
+    class app_schemas_folderupdate_position_cannot_be_null_40ca4e8b function;
+    class app_schemas_sectionupdate_55dff910 klass;
+    class app_schemas_sectionupdate_folder_cannot_be_null_6d85885f function;
+    class app_services_bookmarks_bc794758 module;
+    class app_services_bookmarks_create_bookmark_b916fbeb function;
+    class app_services_bookmarks_delete_bookmark_fd98a444 function;
+    class app_services_bookmarks_list_bookmarks_25b45780 function;
+    class app_core_errors_apierror_d5230271 api;
+    class app_core_errors_apierror_init_48c8d35c function;
+    class app_api_routes_folders_cb1698dd api;
+    class app_api_routes_sections_1c673b55 api;
+    class app_services_folders_9a9f9fba module;
+    class app_services_sections_1b6b34bc module;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>ApiError</code><br><small style="color:var(--muted)">app/core/errors.py</small></td>
+  <td><span class="tag tag-endpoint">API</span></td>
+  <td><code>_get_service_user()</code><br><small style="color:var(--muted)">app/integrations/supabase.py</small><br><code>create_client()</code><br><small style="color:var(--muted)">tests/test_errors.py</small><br><code>db.py</code><br><small style="color:var(--muted)">app/services/db.py</small><br>+22 more</td>
+  <td><code>__init__()</code><br><small style="color:var(--muted)">app/core/errors.py</small></td>
+  <td>ApiError node in app/core/errors.py.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>AuthContext</code><br><small style="color:var(--muted)">app/integrations/supabase.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>_client()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>and closes client()</code><br><small style="color:var(--muted)">tests/test_auth.py</small><br><code>auth.py</code><br><small style="color:var(--muted)">api/routes/auth.py</small><br>+33 more</td>
+  <td>No direct outbound edge</td>
+  <td>AuthContext node in app/integrations/supabase.py.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>ServiceUser</code><br><small style="color:var(--muted)">app/integrations/supabase.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>ServiceUser node in app/integrations/supabase.py.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><code>BookmarkCreate</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>bookmarks.py</code><br><small style="color:var(--muted)">app/services/bookmarks.py</small><br><code>bookmarks.py</code><br><small style="color:var(--muted)">api/routes/bookmarks.py</small><br><code>create_bookmark()</code><br><small style="color:var(--muted)">api/routes/bookmarks.py</small><br>+4 more</td>
+  <td>No direct outbound edge</td>
+  <td>BookmarkCreate node in app/schemas.py.</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><code>BookmarkOut</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>Bookmark</code><br><small style="color:var(--muted)">app/graphql/types.py</small><br><code>bookmarks.py</code><br><small style="color:var(--muted)">api/routes/bookmarks.py</small><br><code>bookmarks.py</code><br><small style="color:var(--muted)">app/services/bookmarks.py</small><br>+7 more</td>
+  <td>No direct outbound edge</td>
+  <td>BookmarkOut node in app/schemas.py.</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><code>BookmarkUpdate</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>bookmarks.py</code><br><small style="color:var(--muted)">api/routes/bookmarks.py</small><br><code>bookmarks.py</code><br><small style="color:var(--muted)">app/services/bookmarks.py</small><br><code>Mutation</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br>+3 more</td>
+  <td>No direct outbound edge</td>
+  <td>BookmarkUpdate node in app/schemas.py.</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><code>FolderCreate</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>create_folder()</code><br><small style="color:var(--muted)">api/routes/folders.py</small><br><code>create_folder()</code><br><small style="color:var(--muted)">app/services/folders.py</small><br><code>create_folder()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br>+4 more</td>
+  <td>No direct outbound edge</td>
+  <td>FolderCreate node in app/schemas.py.</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td><code>FolderOut</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>create_folder()</code><br><small style="color:var(--muted)">api/routes/folders.py</small><br><code>create_folder()</code><br><small style="color:var(--muted)">app/services/folders.py</small><br><code>Folder</code><br><small style="color:var(--muted)">app/graphql/types.py</small><br>+8 more</td>
+  <td>No direct outbound edge</td>
+  <td>FolderOut node in app/schemas.py.</td>
+</tr>
+<tr>
+  <td>9</td>
+  <td><code>FolderTreeOut</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>folders.py</code><br><small style="color:var(--muted)">app/services/folders.py</small><br><code>folders.py</code><br><small style="color:var(--muted)">api/routes/folders.py</small><br><code>list_folder_tree()</code><br><small style="color:var(--muted)">api/routes/folders.py</small><br>+1 more</td>
+  <td>No direct outbound edge</td>
+  <td>FolderTreeOut node in app/schemas.py.</td>
+</tr>
+<tr>
+  <td>10</td>
+  <td><code>FolderUpdate</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>folders.py</code><br><small style="color:var(--muted)">app/services/folders.py</small><br><code>folders.py</code><br><small style="color:var(--muted)">api/routes/folders.py</small><br><code>Mutation</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br>+3 more</td>
+  <td><code>position_cannot_be_null()</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td>FolderUpdate node in app/schemas.py.</td>
+</tr>
+<tr>
+  <td>11</td>
+  <td><code>HealthOut</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>HealthOut node in app/schemas.py.</td>
+</tr>
+<tr>
+  <td>12</td>
+  <td><code>PositionUpdate</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>bookmarks.py</code><br><small style="color:var(--muted)">app/services/bookmarks.py</small><br><code>bookmarks.py</code><br><small style="color:var(--muted)">api/routes/bookmarks.py</small><br><code>db.py</code><br><small style="color:var(--muted)">app/services/db.py</small><br>+13 more</td>
+  <td>No direct outbound edge</td>
+  <td>PositionUpdate node in app/schemas.py.</td>
+</tr>
+<tr>
+  <td>13</td>
+  <td><code>SectionCreate</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>create_section()</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>create_section()</code><br><small style="color:var(--muted)">app/services/sections.py</small><br><code>create_section()</code><br><small style="color:var(--muted)">api/routes/sections.py</small><br>+4 more</td>
+  <td>No direct outbound edge</td>
+  <td>SectionCreate node in app/schemas.py.</td>
+</tr>
+<tr>
+  <td>14</td>
+  <td><code>SectionOut</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>create_section()</code><br><small style="color:var(--muted)">api/routes/sections.py</small><br><code>create_section()</code><br><small style="color:var(--muted)">app/services/sections.py</small><br><code>list_sections()</code><br><small style="color:var(--muted)">app/services/sections.py</small><br>+7 more</td>
+  <td>No direct outbound edge</td>
+  <td>SectionOut node in app/schemas.py.</td>
+</tr>
+<tr>
+  <td>15</td>
+  <td><code>SectionUpdate</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td><span class="tag tag-class">Class</span></td>
+  <td><code>Mutation</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>schema.py</code><br><small style="color:var(--muted)">app/graphql/schema.py</small><br><code>sections.py</code><br><small style="color:var(--muted)">app/services/sections.py</small><br>+3 more</td>
+  <td><code>folder_cannot_be_null()</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td>SectionUpdate node in app/schemas.py.</td>
+</tr>
+<tr>
+  <td>16</td>
+  <td><code>create_bookmark()</code><br><small style="color:var(--muted)">api/routes/bookmarks.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>BookmarkCreate</code><br><small style="color:var(--muted)">app/schemas.py</small><br><code>BookmarkOut</code><br><small style="color:var(--muted)">app/schemas.py</small><br><code>create_bookmark()</code><br><small style="color:var(--muted)">app/services/bookmarks.py</small></td>
+  <td>create_bookmark() node in api/routes/bookmarks.py.</td>
+</tr>
+<tr>
+  <td>17</td>
+  <td><code>delete_bookmark()</code><br><small style="color:var(--muted)">api/routes/bookmarks.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>delete_bookmark()</code><br><small style="color:var(--muted)">app/services/bookmarks.py</small></td>
+  <td>delete_bookmark() node in api/routes/bookmarks.py.</td>
+</tr>
+<tr>
+  <td>18</td>
+  <td><code>list_bookmarks()</code><br><small style="color:var(--muted)">api/routes/bookmarks.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>BookmarkOut</code><br><small style="color:var(--muted)">app/schemas.py</small><br><code>list_bookmarks()</code><br><small style="color:var(--muted)">app/services/bookmarks.py</small></td>
+  <td>list_bookmarks() node in api/routes/bookmarks.py.</td>
+</tr>
+<tr>
+  <td>19</td>
+  <td><code>reorder_bookmarks()</code><br><small style="color:var(--muted)">api/routes/bookmarks.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>PositionUpdate</code><br><small style="color:var(--muted)">app/schemas.py</small><br><code>reorder_bookmarks()</code><br><small style="color:var(--muted)">app/services/bookmarks.py</small></td>
+  <td>reorder_bookmarks() node in api/routes/bookmarks.py.</td>
+</tr>
+<tr>
+  <td>20</td>
+  <td><code>update_bookmark()</code><br><small style="color:var(--muted)">api/routes/bookmarks.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>BookmarkOut</code><br><small style="color:var(--muted)">app/schemas.py</small><br><code>BookmarkUpdate</code><br><small style="color:var(--muted)">app/schemas.py</small><br><code>update_bookmark()</code><br><small style="color:var(--muted)">app/services/bookmarks.py</small></td>
+  <td>update_bookmark() node in api/routes/bookmarks.py.</td>
+</tr>
+<tr>
+  <td>21</td>
+  <td><code>create_folder()</code><br><small style="color:var(--muted)">api/routes/folders.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>create_folder()</code><br><small style="color:var(--muted)">app/services/folders.py</small><br><code>FolderCreate</code><br><small style="color:var(--muted)">app/schemas.py</small><br><code>FolderOut</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td>create_folder() node in api/routes/folders.py.</td>
+</tr>
+<tr>
+  <td>22</td>
+  <td><code>delete_folder()</code><br><small style="color:var(--muted)">api/routes/folders.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>delete_folder()</code><br><small style="color:var(--muted)">app/services/folders.py</small></td>
+  <td>delete_folder() node in api/routes/folders.py.</td>
+</tr>
+<tr>
+  <td>23</td>
+  <td><code>list_folder_tree()</code><br><small style="color:var(--muted)">api/routes/folders.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>FolderTreeOut</code><br><small style="color:var(--muted)">app/schemas.py</small><br><code>list_folder_tree()</code><br><small style="color:var(--muted)">app/services/folders.py</small></td>
+  <td>list_folder_tree() node in api/routes/folders.py.</td>
+</tr>
+<tr>
+  <td>24</td>
+  <td><code>list_folders()</code><br><small style="color:var(--muted)">api/routes/folders.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>FolderOut</code><br><small style="color:var(--muted)">app/schemas.py</small><br><code>list_folders()</code><br><small style="color:var(--muted)">app/services/folders.py</small></td>
+  <td>list_folders() node in api/routes/folders.py.</td>
+</tr>
+<tr>
+  <td>25</td>
+  <td><code>reorder_folders()</code><br><small style="color:var(--muted)">api/routes/folders.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>PositionUpdate</code><br><small style="color:var(--muted)">app/schemas.py</small><br><code>reorder_folders()</code><br><small style="color:var(--muted)">app/services/folders.py</small></td>
+  <td>reorder_folders() node in api/routes/folders.py.</td>
+</tr>
+<tr>
+  <td>26</td>
+  <td><code>update_folder()</code><br><small style="color:var(--muted)">api/routes/folders.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>FolderOut</code><br><small style="color:var(--muted)">app/schemas.py</small><br><code>FolderUpdate</code><br><small style="color:var(--muted)">app/schemas.py</small><br><code>update_folder()</code><br><small style="color:var(--muted)">app/services/folders.py</small></td>
+  <td>update_folder() node in api/routes/folders.py.</td>
+</tr>
+<tr>
+  <td>27</td>
+  <td><code>create_section()</code><br><small style="color:var(--muted)">api/routes/sections.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>create_section()</code><br><small style="color:var(--muted)">app/services/sections.py</small><br><code>SectionCreate</code><br><small style="color:var(--muted)">app/schemas.py</small><br><code>SectionOut</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td>create_section() node in api/routes/sections.py.</td>
+</tr>
+<tr>
+  <td>28</td>
+  <td><code>delete_section()</code><br><small style="color:var(--muted)">api/routes/sections.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>delete_section()</code><br><small style="color:var(--muted)">app/services/sections.py</small></td>
+  <td>delete_section() node in api/routes/sections.py.</td>
+</tr>
+<tr>
+  <td>29</td>
+  <td><code>list_sections()</code><br><small style="color:var(--muted)">api/routes/sections.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>list_sections()</code><br><small style="color:var(--muted)">app/services/sections.py</small><br><code>SectionOut</code><br><small style="color:var(--muted)">app/schemas.py</small></td>
+  <td>list_sections() node in api/routes/sections.py.</td>
+</tr>
+<tr>
+  <td>30</td>
+  <td><code>reorder_sections()</code><br><small style="color:var(--muted)">api/routes/sections.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>PositionUpdate</code><br><small style="color:var(--muted)">app/schemas.py</small><br><code>reorder_sections()</code><br><small style="color:var(--muted)">app/services/sections.py</small></td>
+  <td>reorder_sections() node in api/routes/sections.py.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>app/schemas.py</code></td><td>15 nodes</td></tr>
+<tr><td><code>app/services/folders.py</code></td><td>9 nodes</td></tr>
+<tr><td><code>api/routes/folders.py</code></td><td>7 nodes</td></tr>
+<tr><td><code>api/routes/bookmarks.py</code></td><td>6 nodes</td></tr>
+<tr><td><code>api/routes/sections.py</code></td><td>6 nodes</td></tr>
+<tr><td><code>app/core/errors.py</code></td><td>6 nodes</td></tr>
+<tr><td><code>app/services/bookmarks.py</code></td><td>6 nodes</td></tr>
+<tr><td><code>app/services/db.py</code></td><td>6 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: imports x65, calls x60, contains x56, references x39. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 4. Tests & Fixtures ====== -->
+<h2 id="tests-fixtures">4. Tests &amp; Fixtures</h2>
+<p>Tests &amp; Fixtures groups implementation around test, tests, resourcespy, app, mostly in tests/test_resources.py, tests/test_auth.py, tests/test_config.py. This section covers 232 nodes and 516 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Tests &amp; Fixtures (232 nodes, 516 edges)
+    subgraph tests_fixtures_tests_test_resources_py_5a9a4c25["tests/test_resources.py"]
+        tests_test_resources_fakequery_31a65611("FakeQuery<br/><small>tests/test_resources.py</small>")
+        tests_test_resources_test_graphql_accepts_the_sa_208af9ea("same service key()<br/><small>tests/test_resources.py</small>")
+        tests_test_resources_fakehttpclient_bdd05f16("FakeHttpClient<br/><small>tests/test_resources.py</small>")
+        tests_test_resources_fakehttpclient_aclose_7cc3808c("aclose()<br/><small>tests/test_resources.py</small>")
+        tests_test_resources_fakequery_execute_6e738bc1("execute()<br/><small>tests/test_resources.py</small>")
+        tests_test_resources_fakequery_init_0993938f("__init__()<br/><small>tests/test_resources.py</small>")
+        tests_test_resources_fakequery_select_a9f854e2("select()<br/><small>tests/test_resources.py</small>")
+        tests_test_resources_fakequery_insert_d0b07c90("insert()<br/><small>tests/test_resources.py</small>")
+        tests_test_resources_fakequery_update_fa93aae6("update()<br/><small>tests/test_resources.py</small>")
+        tests_test_resources_fakequery_delete_09962006("delete()<br/><small>tests/test_resources.py</small>")
+        tests_test_resources_fakequery_eq_7c303a07("eq()<br/><small>tests/test_resources.py</small>")
+        tests_test_resources_fakequery_neq_f904ffb4("neq()<br/><small>tests/test_resources.py</small>")
+        tests_test_resources_fakequery_is_209fe288("is_()<br/><small>tests/test_resources.py</small>")
+        tests_test_resources_fakequery_order_37ef3a5d("order()<br/><small>tests/test_resources.py</small>")
+    end
+    app_main_f38e028d("main.py")
+    tests_test_auth_4ee5b601("test_auth.py")
+    tests_test_health_b2fc87e0("test_health.py")
+    tests_test_middleware_43413b56("test_middleware.py")
+    tests_test_resources_fakehttpclient_bdd05f16 -->|method| tests_test_resources_fakehttpclient_aclose_7cc3808c
+    tests_test_resources_fakequery_31a65611 -->|method| tests_test_resources_fakequery_execute_6e738bc1
+    tests_test_resources_fakequery_31a65611 -->|method| tests_test_resources_fakequery_init_0993938f
+    tests_test_resources_fakequery_31a65611 -->|method| tests_test_resources_fakequery_select_a9f854e2
+    tests_test_resources_fakequery_31a65611 -->|method| tests_test_resources_fakequery_insert_d0b07c90
+    tests_test_resources_fakequery_31a65611 -->|method| tests_test_resources_fakequery_update_fa93aae6
+    tests_test_resources_fakequery_31a65611 -->|method| tests_test_resources_fakequery_delete_09962006
+    tests_test_resources_fakequery_31a65611 -->|method| tests_test_resources_fakequery_eq_7c303a07
+    tests_test_resources_fakequery_31a65611 -->|method| tests_test_resources_fakequery_neq_f904ffb4
+    tests_test_resources_fakequery_31a65611 -->|method| tests_test_resources_fakequery_is_209fe288
+    tests_test_resources_fakequery_31a65611 -->|method| tests_test_resources_fakequery_order_37ef3a5d
+    tests_test_resources_test_graphql_accepts_the_sa_208af9ea -->|calls| tests_test_resources_fakehttpclient_bdd05f16
+    tests_test_health_b2fc87e0 -->|imports| app_main_f38e028d
+    tests_test_auth_4ee5b601 -->|imports| app_main_f38e028d
+    %% Omitted for readability: 214 nodes, 0 edges
+    class tests_test_resources_fakequery_31a65611 test;
+    class tests_test_resources_test_graphql_accepts_the_sa_208af9ea test;
+    class tests_test_resources_fakehttpclient_bdd05f16 test;
+    class tests_test_resources_fakehttpclient_aclose_7cc3808c test;
+    class tests_test_resources_fakequery_execute_6e738bc1 test;
+    class tests_test_resources_fakequery_init_0993938f test;
+    class tests_test_resources_fakequery_select_a9f854e2 test;
+    class tests_test_resources_fakequery_insert_d0b07c90 test;
+    class tests_test_resources_fakequery_update_fa93aae6 test;
+    class tests_test_resources_fakequery_delete_09962006 test;
+    class tests_test_resources_fakequery_eq_7c303a07 test;
+    class tests_test_resources_fakequery_neq_f904ffb4 test;
+    class tests_test_resources_fakequery_is_209fe288 test;
+    class tests_test_resources_fakequery_order_37ef3a5d test;
+    class app_main_f38e028d module;
+    class tests_test_auth_4ee5b601 test;
+    class tests_test_health_b2fc87e0 test;
+    class tests_test_middleware_43413b56 test;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>FakeHttpClient</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>configured service key()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>same service key()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><code>aclose()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>FakeHttpClient node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>FakeQuery</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>__init__()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>delete()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>eq()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br>+8 more</td>
+  <td>FakeQuery node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>FakeResponse</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>__init__()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>FakeResponse node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><code>FakeSupabase</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>and user scope()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>and user scope()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>are user scoped()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br>+27 more</td>
+  <td><code>__init__()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>rpc()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>table()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>FakeSupabase node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><code>create_app()</code><br><small style="color:var(--muted)">app/main.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>_client()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>app()</code><br><small style="color:var(--muted)">tests/test_health.py</small><br><code>app()</code><br><small style="color:var(--muted)">tests/test_auth.py</small><br>+12 more</td>
+  <td><code>configure_logging()</code><br><small style="color:var(--muted)">app/core/logging.py</small><br><code>get_settings()</code><br><small style="color:var(--muted)">app/core/config.py</small><br><code>register exception handlers()</code><br><small style="color:var(--muted)">app/core/errors.py</small><br>+2 more</td>
+  <td>create_app() node in app/main.py.</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><code>_assert_user_scoped()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>are user scoped()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>are user scoped()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>are user scoped()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br>+7 more</td>
+  <td>No direct outbound edge</td>
+  <td>_assert_user_scoped() node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><code>_client()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>and user scope()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>and user scope()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>are user scoped()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br>+25 more</td>
+  <td><code>AuthContext</code><br><small style="color:var(--muted)">app/integrations/supabase.py</small><br><code>create_app()</code><br><small style="color:var(--muted)">app/main.py</small></td>
+  <td>_client() node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td><code>.aclose()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>FakeHttpClient</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.aclose() node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>9</td>
+  <td><code>.delete()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>FakeQuery</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.delete() node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>10</td>
+  <td><code>.eq()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>FakeQuery</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.eq() node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>11</td>
+  <td><code>.execute()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>FakeQuery</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.execute() node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>12</td>
+  <td><code>.__init__()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>FakeQuery</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.__init__() node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>13</td>
+  <td><code>.insert()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>FakeQuery</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.insert() node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>14</td>
+  <td><code>.is_()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>FakeQuery</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.is_() node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>15</td>
+  <td><code>.limit()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>FakeQuery</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.limit() node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>16</td>
+  <td><code>.neq()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>FakeQuery</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.neq() node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>17</td>
+  <td><code>.order()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>FakeQuery</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.order() node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>18</td>
+  <td><code>.select()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>FakeQuery</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.select() node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>19</td>
+  <td><code>.update()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>FakeQuery</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.update() node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>20</td>
+  <td><code>.__init__()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>FakeResponse</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.__init__() node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>21</td>
+  <td><code>.__init__()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>FakeSupabase</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.__init__() node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>22</td>
+  <td><code>.rpc()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>FakeSupabase</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.rpc() node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>23</td>
+  <td><code>.table()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td><code>FakeSupabase</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>.table() node in tests/test_resources.py.</td>
+</tr>
+<tr>
+  <td>24</td>
+  <td><code>test_creates_are_user_scoped()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>_assert_user_scoped()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>_client()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>FakeSupabase</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>Verifies imports, entry points, or version behavior.</td>
+</tr>
+<tr>
+  <td>25</td>
+  <td><code>test_database_failures_are_sanitized()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>_client()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>FakeSupabase</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>Verifies imports, entry points, or version behavior.</td>
+</tr>
+<tr>
+  <td>26</td>
+  <td><code>test_deletes_are_user_scoped()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>_assert_user_scoped()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>_client()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>FakeSupabase</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>Verifies imports, entry points, or version behavior.</td>
+</tr>
+<tr>
+  <td>27</td>
+  <td><code>test_folder_creation_preserves_color()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>_client()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>FakeSupabase</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>Verifies imports, entry points, or version behavior.</td>
+</tr>
+<tr>
+  <td>28</td>
+  <td><code>test_folder_creation_scopes_position_to_its_parent()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>_assert_user_scoped()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>_client()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>FakeSupabase</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>Verifies imports, entry points, or version behavior.</td>
+</tr>
+<tr>
+  <td>29</td>
+  <td><code>test_folder_delete_rejects_itself_as_destination()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>_client()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>FakeSupabase</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>Verifies imports, entry points, or version behavior.</td>
+</tr>
+<tr>
+  <td>30</td>
+  <td><code>test_folder_delete_uses_atomic_destination_rpc()</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td><span class="tag tag-func">Test</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>_client()</code><br><small style="color:var(--muted)">tests/test_resources.py</small><br><code>FakeSupabase</code><br><small style="color:var(--muted)">tests/test_resources.py</small></td>
+  <td>Verifies imports, entry points, or version behavior.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>tests/test_resources.py</code></td><td>57 nodes</td></tr>
+<tr><td><code>tests/test_auth.py</code></td><td>24 nodes</td></tr>
+<tr><td><code>tests/test_config.py</code></td><td>18 nodes</td></tr>
+<tr><td><code>app/core/config.py</code></td><td>14 nodes</td></tr>
+<tr><td><code>tests/integration/test_supabase.py</code></td><td>11 nodes</td></tr>
+<tr><td><code>tests/test_health.py</code></td><td>9 nodes</td></tr>
+<tr><td><code>tests/test_errors.py</code></td><td>8 nodes</td></tr>
+<tr><td><code>app/core/logging.py</code></td><td>7 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: calls x128, contains x125, references x119, method x32. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 5. App Application Configuration ====== -->
+<h2 id="app-application-configuration">5. App Application Configuration</h2>
+<p>App Application Configuration groups implementation around app, application, configuration, shared, mostly in app/core/__init__.py. This section covers 2 nodes and 1 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: App Application Configuration (2 nodes, 1 edges)
+    app_core_init_rationale_1_531b73eb("Application configuration and shared in...<br/><small>app/core/__init__.py</small>")
+    app_core_init_53a83aa2("__init__.py")
+    app_core_init_rationale_1_531b73eb -->|explains| app_core_init_53a83aa2
+    class app_core_init_rationale_1_531b73eb concept;
+    class app_core_init_53a83aa2 module;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>core/__init__.py</code><br><small style="color:var(--muted)">app/core/__init__.py</small></td>
+  <td><span class="tag tag-class">Module</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Module file in app/core/__init__.py.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>Application configuration and shared infrastructure.</code><br><small style="color:var(--muted)">app/core/__init__.py</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for Application configuration and shared infrastructure..</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>app/core/__init__.py</code></td><td>2 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: explains x1. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 6. Integrations App External ====== -->
+<h2 id="integrations-app-external">6. Integrations App External</h2>
+<p>Integrations App External groups implementation around integrations, app, external, service, mostly in app/integrations/__init__.py. This section covers 2 nodes and 1 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Integrations App External (2 nodes, 1 edges)
+    app_integrations_init_rationale_1_6eea0cd8("External service integrations.<br/><small>app/integrations/__init__.py</small>")
+    app_integrations_init_1bd331c9("__init__.py")
+    app_integrations_init_rationale_1_6eea0cd8 -->|explains| app_integrations_init_1bd331c9
+    class app_integrations_init_rationale_1_6eea0cd8 concept;
+    class app_integrations_init_1bd331c9 module;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>integrations/__init__.py</code><br><small style="color:var(--muted)">app/integrations/__init__.py</small></td>
+  <td><span class="tag tag-class">Module</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Module file in app/integrations/__init__.py.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>External service integrations.</code><br><small style="color:var(--muted)">app/integrations/__init__.py</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for External service integrations..</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>app/integrations/__init__.py</code></td><td>2 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: explains x1. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 7. App ====== -->
+<h2 id="app">7. App</h2>
+<p>App groups implementation around app, mostly in app/__init__.py. This section covers 1 nodes and 0 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: App (1 nodes, 0 edges)
+    app_init_831506f4("__init__.py")
+    class app_init_831506f4 module;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>app/__init__.py</code><br><small style="color:var(--muted)">app/__init__.py</small></td>
+  <td><span class="tag tag-class">Module</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Module file in app/__init__.py.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>app/__init__.py</code></td><td>1 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: No high-confidence call edges detected. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 8. Middleware App ====== -->
+<h2 id="middleware-app">8. Middleware App</h2>
+<p>Middleware App groups implementation around middleware, app, mostly in app/middleware/__init__.py. This section covers 1 nodes and 0 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Middleware App (1 nodes, 0 edges)
+    app_middleware_init_eb96e12f("__init__.py")
+    class app_middleware_init_eb96e12f module;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>middleware/__init__.py</code><br><small style="color:var(--muted)">app/middleware/__init__.py</small></td>
+  <td><span class="tag tag-class">Module</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Module file in app/middleware/__init__.py.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>app/middleware/__init__.py</code></td><td>1 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: No high-confidence call edges detected. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 9. Fastapi Bookmark Pyprojecttoml ====== -->
+<h2 id="fastapi-bookmark-pyprojecttoml">9. Fastapi Bookmark Pyprojecttoml</h2>
+<p>Fastapi Bookmark Pyprojecttoml groups implementation around fastapi, bookmark, pyprojecttoml, mostly in pyproject.toml. This section covers 1 nodes and 0 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Fastapi Bookmark Pyprojecttoml (1 nodes, 0 edges)
+    pkg_fastapi_bookmark_916e6f67("fastapi-bookmark<br/><small>pyproject.toml</small>")
+    class pkg_fastapi_bookmark_916e6f67 module;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>fastapi-bookmark</code><br><small style="color:var(--muted)">pyproject.toml</small></td>
+  <td><span class="tag tag-class">Module</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>fastapi-bookmark node in pyproject.toml.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>pyproject.toml</code></td><td>1 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: No high-confidence call edges detected. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<h2 id="stats">Project Statistics</h2>
+
+<div class="grid">
+  <div class="card">
+    <h4>Graph</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><td>Nodes</td><td>396</td></tr>
+      <tr><td>Edges</td><td>1129</td></tr>
+      <tr><td>Hyperedges</td><td>0</td></tr>
+      <tr><td>Communities</td><td>20</td></tr>
+      <tr><td>Documented Sections</td><td>8</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Edge Confidence</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><td>EXTRACTED</td><td>973</td></tr>
+      <tr><td>INFERRED</td><td>156</td></tr>
+      <tr><td>AMBIGUOUS</td><td>0</td></tr>
+    </table>
+  </div>
+</div>
+
+<div style="text-align:center; padding:40px 0; color: var(--muted); font-size:0.9rem;">
+  <p>api-bookmark — Architecture Documentation</p>
+  <p>Generated: 2026-08-17 00:44 UTC · graphify callflow-html</p>
+</div>
+
+</div><!-- .container -->
+
+<script>
+(function () {
+  const mermaidConfig = {
+    startOnLoad: false,
+    theme: 'dark',
+    securityLevel: 'loose',
+    flowchart: { htmlLabels: true, useMaxWidth: true },
+    themeVariables: {
+      primaryColor: '#1e293b',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#38bdf8',
+      secondaryColor: '#0f172a',
+      tertiaryColor: '#334155',
+      lineColor: '#64748b',
+      textColor: '#e2e8f0',
+    }
+  };
+
+  mermaid.initialize(mermaidConfig);
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function enhanceMermaidDiagrams() {
+    document.querySelectorAll('.mermaid').forEach((container) => {
+      if (container.dataset.zoomReady === 'true') return;
+      const svg = container.querySelector('svg');
+      if (!svg) return;
+
+      container.dataset.zoomReady = 'true';
+      container.classList.add('is-enhanced');
+
+      const viewport = document.createElement('div');
+      viewport.className = 'mermaid-viewport';
+      svg.parentNode.insertBefore(viewport, svg);
+      viewport.appendChild(svg);
+
+      const toolbar = document.createElement('div');
+      toolbar.className = 'mermaid-toolbar';
+      toolbar.innerHTML = [
+        '<button type="button" data-action="zoom-out" title="Zoom out">-</button>',
+        '<span class="zoom-level" data-role="level">100%</span>',
+        '<button type="button" data-action="zoom-in" title="Zoom in">+</button>',
+        '<button type="button" data-action="fit" title="Fit width">Fit</button>',
+        '<button type="button" data-action="reset" title="Reset view">Reset</button>'
+      ].join('');
+      container.insertBefore(toolbar, viewport);
+
+      const state = { scale: 1, x: 0, y: 0, dragging: false, startX: 0, startY: 0, originX: 0, originY: 0 };
+      const level = toolbar.querySelector('[data-role="level"]');
+
+      function applyTransform() {
+        svg.style.transform = `translate(${state.x}px, ${state.y}px) scale(${state.scale})`;
+        level.textContent = `${Math.round(state.scale * 100)}%`;
+      }
+
+      function zoomBy(delta) {
+        state.scale = clamp(state.scale + delta, 0.25, 3);
+        applyTransform();
+      }
+
+      function reset() {
+        state.scale = 1;
+        state.x = 0;
+        state.y = 0;
+        applyTransform();
+      }
+
+      function fitWidth() {
+        const rawWidth = svg.viewBox && svg.viewBox.baseVal && svg.viewBox.baseVal.width
+          ? svg.viewBox.baseVal.width
+          : svg.getBoundingClientRect().width / state.scale;
+        if (!rawWidth) {
+          reset();
+          return;
+        }
+        state.scale = clamp((viewport.clientWidth - 48) / rawWidth, 0.25, 1.4);
+        state.x = 0;
+        state.y = 0;
+        applyTransform();
+      }
+
+      toolbar.addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-action]');
+        if (!button) return;
+        const action = button.dataset.action;
+        if (action === 'zoom-in') zoomBy(0.15);
+        if (action === 'zoom-out') zoomBy(-0.15);
+        if (action === 'fit') fitWidth();
+        if (action === 'reset') reset();
+      });
+
+      viewport.addEventListener('wheel', (event) => {
+        if (!event.ctrlKey && !event.metaKey) return;
+        event.preventDefault();
+        zoomBy(event.deltaY < 0 ? 0.1 : -0.1);
+      }, { passive: false });
+
+      viewport.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return;
+        state.dragging = true;
+        state.startX = event.clientX;
+        state.startY = event.clientY;
+        state.originX = state.x;
+        state.originY = state.y;
+        viewport.classList.add('is-dragging');
+        viewport.setPointerCapture(event.pointerId);
+      });
+
+      viewport.addEventListener('pointermove', (event) => {
+        if (!state.dragging) return;
+        state.x = state.originX + event.clientX - state.startX;
+        state.y = state.originY + event.clientY - state.startY;
+        applyTransform();
+      });
+
+      function endDrag(event) {
+        if (!state.dragging) return;
+        state.dragging = false;
+        viewport.classList.remove('is-dragging');
+        if (viewport.hasPointerCapture(event.pointerId)) {
+          viewport.releasePointerCapture(event.pointerId);
+        }
+      }
+
+      viewport.addEventListener('pointerup', endDrag);
+      viewport.addEventListener('pointercancel', endDrag);
+      applyTransform();
+    });
+  }
+
+  function renderMermaid() {
+    const result = mermaid.run
+      ? mermaid.run({ querySelector: '.mermaid' })
+      : Promise.resolve();
+    Promise.resolve(result)
+      .then(enhanceMermaidDiagrams)
+      .catch((error) => {
+        console.error('Mermaid render failed:', error);
+        enhanceMermaidDiagrams();
+      });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', renderMermaid);
+  } else {
+    renderMermaid();
+  }
+})();
+</script>
+
+</body>
+</html>

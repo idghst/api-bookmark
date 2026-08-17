@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>api-bookmark — graphify tree viewer</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f9f9f9;
+      color: #333;
+    }
+    h1 {
+      margin: 20px 0 0 24px;
+      font-size: 2.2rem;
+      font-weight: bold;
+      color: #1e3a56;
+    }
+    .controls {
+      margin: 20px 0 15px 24px;
+    }
+    button {
+      margin-right: 10px;
+      padding: 8px 18px;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s ease-in-out;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    button:active {
+      background: #004085;
+    }
+    #tree-container {
+      width: calc(100vw - 48px); /* Adjust for body margin/padding */
+      height: 85vh;
+      overflow: auto;
+      border-radius: 8px;
+      background: #fff;
+      margin-left: 24px;
+      margin-right: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      border: 1px solid #ddd;
+    }
+    svg {
+      background: #fff;
+      border-radius: 8px;
+      display: block; /* Important for D3 */
+    }
+    .node circle {
+      stroke-width: 2.5px;
+    }
+    .node text { /* Base style for the <text> container */
+      font: 13px 'Segoe UI', sans-serif;
+      paint-order: stroke fill; /* Ensures text is readable over lines */
+      stroke: #fff; /* White halo */
+      stroke-width: 3px; /* Halo thickness */
+      stroke-linejoin: round;
+      stroke-opacity: 0.85; /* Halo opacity */
+    }
+    .link {
+      fill: none;
+      stroke-opacity: 0.7;
+      stroke-width: 2px;
+    }
+  </style>
+</head>
+<body>
+  <h1>api-bookmark — Knowledge Graph</h1>
+  <div class="controls">
+    <button onclick="expandAll()">Expand All</button>
+    <button onclick="collapseAll()">Collapse All</button>
+    <button onclick="resetView()">Reset View</button>
+  </div>
+  <div id="tree-container">
+    <svg id="tree-svg" width="6000" height="8000"></svg>
+  </div>
+
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+    const initialJsonData = {"name":"api-bookmark","total_count":289,"children":[{"name":"app","total_count":146,"children":[{"name":"api","total_count":25,"children":[{"name":"routes","total_count":23,"children":[{"name":"auth.py","total_count":1,"children":[{"name":"me()","total_count":1,"children":[]}]},{"name":"bookmarks.py","total_count":5,"children":[{"name":"create_bookmark()","total_count":1,"children":[]},{"name":"delete_bookmark()","total_count":1,"children":[]},{"name":"list_bookmarks()","total_count":1,"children":[]},{"name":"reorder_bookmarks()","total_count":1,"children":[]},{"name":"update_bookmark()","total_count":1,"children":[]}]},{"name":"folders.py","total_count":6,"children":[{"name":"create_folder()","total_count":1,"children":[]},{"name":"delete_folder()","total_count":1,"children":[]},{"name":"list_folder_tree()","total_count":1,"children":[]},{"name":"list_folders()","total_count":1,"children":[]},{"name":"reorder_folders()","total_count":1,"children":[]},{"name":"update_folder()","total_count":1,"children":[]}]},{"name":"health.py","total_count":4,"children":[{"name":"legacy_health()","total_count":1,"children":[]},{"name":"liveness()","total_count":1,"children":[]},{"name":"probe_supabase()","total_count":1,"children":[]},{"name":"readiness()","total_count":1,"children":[]}]},{"name":"sections.py","total_count":5,"children":[{"name":"create_section()","total_count":1,"children":[]},{"name":"delete_section()","total_count":1,"children":[]},{"name":"list_sections()","total_count":1,"children":[]},{"name":"reorder_sections()","total_count":1,"children":[]},{"name":"update_section()","total_count":1,"children":[]}]},{"name":"__init__.py","total_count":1,"children":[]},{"name":"resources.py","total_count":1,"children":[]}]},{"name":"__init__.py","total_count":1,"children":[]},{"name":"router.py","total_count":1,"children":[]}]},{"name":"core","total_count":27,"children":[{"name":"__init__.py","total_count":1,"children":[{"name":"Application configuration and shared infrastructure.","total_count":1,"children":[]}]},{"name":"config.py","total_count":13,"children":[{"name":".docs_enabled()","total_count":1,"children":[]},{"name":".normalize_blank_bookmark_service_value()","total_count":1,"children":[]},{"name":".normalize_blank_secret_key()","total_count":1,"children":[]},{"name":".require_concrete_cors_origins()","total_count":1,"children":[]},{"name":".require_https_supabase_in_production()","total_count":1,"children":[]},{"name":".require_nonblank_publishable_key()","total_count":1,"children":[]},{"name":".require_supabase_origin()","total_count":1,"children":[]},{"name":"_has_valid_host()","total_count":1,"children":[]},{"name":"_require_http_origin()","total_count":1,"children":[]},{"name":"clear_settings_cache()","total_count":1,"children":[]},{"name":"get_settings()","total_count":1,"children":[]},{"name":"Settings","total_count":1,"children":[]},{"name":"Validated runtime configuration loaded from the environment.","total_count":1,"children":[]}]},{"name":"errors.py","total_count":7,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":"_error_response()","total_count":1,"children":[]},{"name":"An expected API failure with a stable public code.","total_count":1,"children":[]},{"name":"ApiError","total_count":1,"children":[]},{"name":"Register public error envelopes without exposing internal details.","total_count":1,"children":[]},{"name":"register_exception_handlers()","total_count":1,"children":[]},{"name":"Stable JSON error responses.","total_count":1,"children":[]}]},{"name":"logging.py","total_count":6,"children":[{"name":".format()","total_count":1,"children":[]},{"name":"Configure the root logger with one UTC JSON stream handler.","total_count":1,"children":[]},{"name":"configure_logging()","total_count":1,"children":[]},{"name":"JSON logging configuration.","total_count":1,"children":[]},{"name":"JsonFormatter","total_count":1,"children":[]},{"name":"Serialize the request fields used by application logs.","total_count":1,"children":[]}]}]},{"name":"graphql","total_count":38,"children":[{"name":"context.py","total_count":3,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":"get_graphql_context()","total_count":1,"children":[]},{"name":"GraphQLContext","total_count":1,"children":[]}]},{"name":"errors.py","total_count":3,"children":[{"name":"positions()","total_count":1,"children":[]},{"name":"resolve()","total_count":1,"children":[]},{"name":"update_values()","total_count":1,"children":[]}]},{"name":"inputs.py","total_count":7,"children":[{"name":"BookmarkCreateInput","total_count":1,"children":[]},{"name":"BookmarkUpdateInput","total_count":1,"children":[]},{"name":"FolderCreateInput","total_count":1,"children":[]},{"name":"FolderUpdateInput","total_count":1,"children":[]},{"name":"PositionInput","total_count":1,"children":[]},{"name":"SectionCreateInput","total_count":1,"children":[]},{"name":"SectionUpdateInput","total_count":1,"children":[]}]},{"name":"schema.py","total_count":18,"children":[{"name":".bookmarks()","total_count":1,"children":[]},{"name":".create_bookmark()","total_count":1,"children":[]},{"name":".create_folder()","total_count":1,"children":[]},{"name":".create_section()","total_count":1,"children":[]},{"name":".delete_bookmark()","total_count":1,"children":[]},{"name":".delete_folder()","total_count":1,"children":[]},{"name":".delete_section()","total_count":1,"children":[]},{"name":".folders()","total_count":1,"children":[]},{"name":".reorder_bookmarks()","total_count":1,"children":[]},{"name":".reorder_folders()","total_count":1,"children":[]},{"name":".reorder_sections()","total_count":1,"children":[]},{"name":".sections()","total_count":1,"children":[]},{"name":".status()","total_count":1,"children":[]},{"name":".update_bookmark()","total_count":1,"children":[]},{"name":".update_folder()","total_count":1,"children":[]},{"name":".update_section()","total_count":1,"children":[]},{"name":"Mutation","total_count":1,"children":[]},{"name":"Query","total_count":1,"children":[]}]},{"name":"types.py","total_count":6,"children":[{"name":".from_model()","total_count":1,"children":[]},{"name":".from_model()","total_count":1,"children":[]},{"name":".from_model()","total_count":1,"children":[]},{"name":"Bookmark","total_count":1,"children":[]},{"name":"Folder","total_count":1,"children":[]},{"name":"Section","total_count":1,"children":[]}]},{"name":"__init__.py","total_count":1,"children":[]}]},{"name":"integrations","total_count":8,"children":[{"name":"__init__.py","total_count":1,"children":[{"name":"External service integrations.","total_count":1,"children":[]}]},{"name":"supabase.py","total_count":7,"children":[{"name":"_get_service_user()","total_count":1,"children":[]},{"name":"_new_client()","total_count":1,"children":[]},{"name":"AuthContext","total_count":1,"children":[]},{"name":"get_admin_client()","total_count":1,"children":[]},{"name":"get_auth_context()","total_count":1,"children":[]},{"name":"get_resource_auth_context()","total_count":1,"children":[]},{"name":"ServiceUser","total_count":1,"children":[]}]}]},{"name":"main.py","total_count":1,"children":[{"name":"create_app()","total_count":1,"children":[]}]},{"name":"middleware","total_count":7,"children":[{"name":"request_context.py","total_count":6,"children":[{"name":".dispatch()","total_count":1,"children":[]},{"name":"Attach a request ID and log the completed request without headers.","total_count":1,"children":[]},{"name":"Keep safe client IDs or create a fresh server request ID.","total_count":1,"children":[]},{"name":"Request ID propagation and request completion logging.","total_count":1,"children":[]},{"name":"RequestContextMiddleware","total_count":1,"children":[]},{"name":"resolve_request_id()","total_count":1,"children":[]}]},{"name":"__init__.py","total_count":1,"children":[]}]},{"name":"schemas.py","total_count":14,"children":[{"name":".folder_cannot_be_null()","total_count":1,"children":[]},{"name":".position_cannot_be_null()","total_count":1,"children":[]},{"name":"BookmarkCreate","total_count":1,"children":[]},{"name":"BookmarkOut","total_count":1,"children":[]},{"name":"BookmarkUpdate","total_count":1,"children":[]},{"name":"FolderCreate","total_count":1,"children":[]},{"name":"FolderOut","total_count":1,"children":[]},{"name":"FolderTreeOut","total_count":1,"children":[]},{"name":"FolderUpdate","total_count":1,"children":[]},{"name":"HealthOut","total_count":1,"children":[]},{"name":"PositionUpdate","total_count":1,"children":[]},{"name":"SectionCreate","total_count":1,"children":[]},{"name":"SectionOut","total_count":1,"children":[]},{"name":"SectionUpdate","total_count":1,"children":[]}]},{"name":"services","total_count":24,"children":[{"name":"__init__.py","total_count":1,"children":[{"name":"Domain services for bookmarks, folders, and sections.","total_count":1,"children":[]}]},{"name":"bookmarks.py","total_count":5,"children":[{"name":"create_bookmark()","total_count":1,"children":[]},{"name":"delete_bookmark()","total_count":1,"children":[]},{"name":"list_bookmarks()","total_count":1,"children":[]},{"name":"reorder_bookmarks()","total_count":1,"children":[]},{"name":"update_bookmark()","total_count":1,"children":[]}]},{"name":"db.py","total_count":5,"children":[{"name":"ensure_row()","total_count":1,"children":[]},{"name":"execute()","total_count":1,"children":[]},{"name":"next_position()","total_count":1,"children":[]},{"name":"now()","total_count":1,"children":[]},{"name":"reorder()","total_count":1,"children":[]}]},{"name":"folders.py","total_count":8,"children":[{"name":"create_folder()","total_count":1,"children":[]},{"name":"delete_folder()","total_count":1,"children":[]},{"name":"folder_parent_map()","total_count":1,"children":[]},{"name":"list_folder_tree()","total_count":1,"children":[]},{"name":"list_folders()","total_count":1,"children":[]},{"name":"reorder_folders()","total_count":1,"children":[]},{"name":"update_folder()","total_count":1,"children":[]},{"name":"validate_folder_parent()","total_count":1,"children":[]}]},{"name":"sections.py","total_count":5,"children":[{"name":"create_section()","total_count":1,"children":[]},{"name":"delete_section()","total_count":1,"children":[]},{"name":"list_sections()","total_count":1,"children":[]},{"name":"reorder_sections()","total_count":1,"children":[]},{"name":"update_section()","total_count":1,"children":[]}]}]},{"name":"__init__.py","total_count":1,"children":[]},{"name":"graphql_api.py","total_count":1,"children":[]}]},{"name":"pyproject.toml","total_count":1,"children":[{"name":"fastapi-bookmark","total_count":1,"children":[]}]},{"name":"tests","total_count":136,"children":[{"name":"integration","total_count":11,"children":[{"name":"__init__.py","total_count":1,"children":[{"name":"Live Supabase integration checks.","total_count":1,"children":[]}]},{"name":"test_supabase.py","total_count":10,"children":[{"name":"credentials()","total_count":1,"children":[]},{"name":"IntegrationCredentials","total_count":1,"children":[]},{"name":"load_integration_credentials()","total_count":1,"children":[]},{"name":"test_auth_health_endpoint()","total_count":1,"children":[]},{"name":"test_data_api_accepts_bookmark_schema_profile()","total_count":1,"children":[]},{"name":"test_initial_migration_creates_only_bookmark_schema_contract()","total_count":1,"children":[]},{"name":"test_integration_credential_gate_rejects_unset_empty_and_whitespace_values()","total_count":1,"children":[]},{"name":"test_local_data_api_exposes_bookmark_schema()","total_count":1,"children":[]},{"name":"test_local_supabase_project_id_is_unique_to_bookmark_service()","total_count":1,"children":[]},{"name":"test_verified_access_token_reaches_auth_me()","total_count":1,"children":[]}]}]},{"name":"test_auth.py","total_count":23,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".aclose()","total_count":1,"children":[]},{"name":".auth()","total_count":1,"children":[]},{"name":".get_user()","total_count":1,"children":[]},{"name":"app()","total_count":1,"children":[]},{"name":"auth_context()","total_count":1,"children":[]},{"name":"client()","total_count":1,"children":[]},{"name":"FakeAuth","total_count":1,"children":[]},{"name":"FakeHttpClient","total_count":1,"children":[]},{"name":"FakePostgrest","total_count":1,"children":[]},{"name":"FakeSupabaseClient","total_count":1,"children":[]},{"name":"settings()","total_count":1,"children":[]},{"name":"test_admin_client_requires_secret_key()","total_count":1,"children":[]},{"name":"test_admin_client_uses_only_secret_key_and_closes_client()","total_count":1,"children":[]},{"name":"test_auth_context_maps_authentication_failures()","total_count":1,"children":[]},{"name":"test_auth_context_scopes_verified_token_and_closes_client()","total_count":1,"children":[]},{"name":"test_client_creation_failure_closes_http_client()","total_count":1,"children":[]},{"name":"test_me_requires_bearer_token()","total_count":1,"children":[]},{"name":"test_me_returns_verified_identity()","total_count":1,"children":[]},{"name":"verified_user()","total_count":1,"children":[]}]},{"name":"test_config.py","total_count":17,"children":[{"name":"test_app_name_is_fixed()","total_count":1,"children":[]},{"name":"test_blank_optional_secret_key_is_normalized_to_none()","total_count":1,"children":[]},{"name":"test_cors_allows_concrete_origins()","total_count":1,"children":[]},{"name":"test_cors_origins_default_to_empty()","total_count":1,"children":[]},{"name":"test_cors_rejects_non_origin_values()","total_count":1,"children":[]},{"name":"test_cors_wildcard_is_rejected()","total_count":1,"children":[]},{"name":"test_development_accepts_local_http_supabase_url()","total_count":1,"children":[]},{"name":"test_docs_can_be_explicitly_enabled_in_production()","total_count":1,"children":[]},{"name":"test_production_disables_docs_by_default()","total_count":1,"children":[]},{"name":"test_production_requires_https_supabase_url()","total_count":1,"children":[]},{"name":"test_publishable_key_must_not_be_blank()","total_count":1,"children":[]},{"name":"test_pytest_environment_ignores_local_runtime_settings()","total_count":1,"children":[]},{"name":"test_schema_cannot_be_overridden()","total_count":1,"children":[]},{"name":"test_settings_cache_can_be_cleared()","total_count":1,"children":[]},{"name":"test_supabase_url_must_be_http_url()","total_count":1,"children":[]},{"name":"test_supabase_url_rejects_non_origin_values()","total_count":1,"children":[]},{"name":"test_timeout_must_be_positive()","total_count":1,"children":[]}]},{"name":"test_database_migration.py","total_count":6,"children":[{"name":"test_folder_hierarchy_migration_enforces_safe_tree_and_delete_contract()","total_count":1,"children":[]},{"name":"test_resource_migration_creates_expected_tables()","total_count":1,"children":[]},{"name":"test_resource_migration_has_operation_specific_owner_policies()","total_count":1,"children":[]},{"name":"test_section_color_migration_adds_nullable_color_column()","total_count":1,"children":[]},{"name":"test_section_move_constraint_fix_defers_linked_bookmark_foreign_key()","total_count":1,"children":[]},{"name":"test_section_move_migration_moves_linked_bookmarks_atomically()","total_count":1,"children":[]}]},{"name":"test_errors.py","total_count":7,"children":[{"name":"create_client()","total_count":1,"children":[]},{"name":"test_api_error_envelope()","total_count":1,"children":[]},{"name":"test_http_error_has_stable_code()","total_count":1,"children":[]},{"name":"test_missing_route_uses_http_error_envelope_and_request_id()","total_count":1,"children":[]},{"name":"test_unexpected_error_does_not_expose_details()","total_count":1,"children":[]},{"name":"test_unexpected_error_preserves_request_id_and_logs_500()","total_count":1,"children":[]},{"name":"test_validation_error_has_stable_code()","total_count":1,"children":[]}]},{"name":"test_health.py","total_count":8,"children":[{"name":"app()","total_count":1,"children":[]},{"name":"client()","total_count":1,"children":[]},{"name":"settings()","total_count":1,"children":[]},{"name":"test_factory_injects_supplied_settings()","total_count":1,"children":[]},{"name":"test_liveness()","total_count":1,"children":[]},{"name":"test_production_disables_documentation_and_schema()","total_count":1,"children":[]},{"name":"test_production_exposes_graphql_ide_but_keeps_operations_authenticated()","total_count":1,"children":[]},{"name":"test_readiness_maps_upstream_failure()","total_count":1,"children":[]}]},{"name":"test_middleware.py","total_count":4,"children":[{"name":"test_configure_logging_emits_json_with_request_fields()","total_count":1,"children":[]},{"name":"test_middleware_returns_request_id_header()","total_count":1,"children":[]},{"name":"test_request_id_accepts_safe_value()","total_count":1,"children":[]},{"name":"test_request_id_replaces_unsafe_value()","total_count":1,"children":[]}]},{"name":"test_resources.py","total_count":56,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".aclose()","total_count":1,"children":[]},{"name":".delete()","total_count":1,"children":[]},{"name":".eq()","total_count":1,"children":[]},{"name":".execute()","total_count":1,"children":[]},{"name":".insert()","total_count":1,"children":[]},{"name":".is_()","total_count":1,"children":[]},{"name":".limit()","total_count":1,"children":[]},{"name":".neq()","total_count":1,"children":[]},{"name":".order()","total_count":1,"children":[]},{"name":".rpc()","total_count":1,"children":[]},{"name":".select()","total_count":1,"children":[]},{"name":".table()","total_count":1,"children":[]},{"name":".update()","total_count":1,"children":[]},{"name":"_assert_user_scoped()","total_count":1,"children":[]},{"name":"_client()","total_count":1,"children":[]},{"name":"_user()","total_count":1,"children":[]},{"name":"FakeHttpClient","total_count":1,"children":[]},{"name":"FakeQuery","total_count":1,"children":[]},{"name":"FakeResponse","total_count":1,"children":[]},{"name":"FakeSupabase","total_count":1,"children":[]},{"name":"test_creates_are_user_scoped()","total_count":1,"children":[]},{"name":"test_database_failures_are_sanitized()","total_count":1,"children":[]},{"name":"test_deletes_are_user_scoped()","total_count":1,"children":[]},{"name":"test_folder_creation_preserves_color()","total_count":1,"children":[]},{"name":"test_folder_creation_scopes_position_to_its_parent()","total_count":1,"children":[]},{"name":"test_folder_delete_rejects_itself_as_destination()","total_count":1,"children":[]},{"name":"test_folder_delete_uses_atomic_destination_rpc()","total_count":1,"children":[]},{"name":"test_folder_move_rejects_a_descendant_as_parent()","total_count":1,"children":[]},{"name":"test_folder_tree_returns_nested_nodes_from_flat_folders()","total_count":1,"children":[]},{"name":"test_graphql_accepts_the_same_service_key()","total_count":1,"children":[]},{"name":"test_graphql_bookmark_mutations_share_rest_crud_and_user_scope()","total_count":1,"children":[]},{"name":"test_graphql_folder_and_section_mutations_share_rest_crud()","total_count":1,"children":[]},{"name":"test_graphql_folder_hierarchy_fields_share_rest_contract()","total_count":1,"children":[]},{"name":"test_graphql_lists_share_the_rest_data_and_user_scope()","total_count":1,"children":[]},{"name":"test_graphql_maps_missing_rows_to_not_found()","total_count":1,"children":[]},{"name":"test_graphql_maps_validation_errors_to_bad_user_input()","total_count":1,"children":[]},{"name":"test_graphql_section_move_uses_atomic_rpc()","total_count":1,"children":[]},{"name":"test_invalid_database_payload_is_sanitized()","total_count":1,"children":[]},{"name":"test_legacy_health_alias()","total_count":1,"children":[]},{"name":"test_lists_are_user_scoped()","total_count":1,"children":[]},{"name":"test_missing_resource_uses_stable_404()","total_count":1,"children":[]},{"name":"test_reorder_missing_resource_uses_stable_404()","total_count":1,"children":[]},{"name":"test_reorders_are_user_scoped()","total_count":1,"children":[]},{"name":"test_resources_accept_configured_service_key()","total_count":1,"children":[]},{"name":"test_resources_reject_invalid_service_key()","total_count":1,"children":[]},{"name":"test_resources_require_authentication()","total_count":1,"children":[]},{"name":"test_section_creation_preserves_color()","total_count":1,"children":[]},{"name":"test_section_list_returns_color()","total_count":1,"children":[]},{"name":"test_section_move_rejects_null_folder()","total_count":1,"children":[]},{"name":"test_section_move_updates_name_and_color_in_the_same_rpc()","total_count":1,"children":[]},{"name":"test_section_move_uses_atomic_rpc_and_returns_moved_section()","total_count":1,"children":[]},{"name":"test_section_update_preserves_color()","total_count":1,"children":[]},{"name":"test_updates_are_user_scoped()","total_count":1,"children":[]}]},{"name":"test_vercel_config.py","total_count":3,"children":[{"name":"test_readme_requires_preview_source_deployment()","total_count":1,"children":[]},{"name":"test_vercel_config_uses_fastapi_fluid_function()","total_count":1,"children":[]},{"name":"test_vercelignore_excludes_non_runtime_content_without_hiding_app()","total_count":1,"children":[]}]},{"name":"conftest.py","total_count":1,"children":[]}]},{"name":"vercel.json","total_count":6,"children":[{"name":"$schema","total_count":1,"children":[]},{"name":"app/main.py","total_count":1,"children":[]},{"name":"fluid","total_count":1,"children":[]},{"name":"framework","total_count":1,"children":[]},{"name":"functions","total_count":1,"children":[]},{"name":"maxDuration","total_count":1,"children":[]}]}]};
+
+    function transformData(jsonData) {
+        // Helper function to recursively build the children structure
+        function processNode(node, parentL1StageName) {
+            let displayName = node.name;
+            // Append total_count if it exists and is not already in the name
+            if (node.total_count !== undefined) {
+                if (!/\(Total Count: \d+\)$/.test(displayName)) {
+                    displayName += ` (Total Count: ${node.total_count})`;
+                }
+            }
+
+            const newNode = { name: displayName };
+
+            if (parentL1StageName === "Root") {
+                 newNode.originalStageName = node.name;
+            } else {
+                newNode.originalStageName = parentL1StageName;
+            }
+
+            if (node.children && node.children.length > 0) {
+                const stageNameToPass = (parentL1StageName === "Root") ? node.name : parentL1StageName;
+                newNode.children = node.children.map(child => processNode(child, stageNameToPass));
+            }
+
+            return newNode;
+        }
+
+        let rootDisplayName = jsonData.name;
+        if (jsonData.total_count !== undefined && !/\(Total Count: \d+\)$/.test(rootDisplayName)) {
+            rootDisplayName += ` (Total Count: ${jsonData.total_count})`;
+        }
+
+        return {
+            name: rootDisplayName,
+            originalStageName: "Root",
+            children: (jsonData.children || []).map(child => processNode(child, "Root"))
+        };
+    }
+
+    const treeData = transformData(initialJsonData);
+
+    // Auto-populated phaseColors: every depth-1 child of the root gets
+    // a stable colour from a bigger palette so all top-level dirs are
+    // distinguishable.
+    const PALETTE = [
+      ["#3498DB","#2980B9","#AED6F1"], ["#2ECC71","#27AE60","#A9DFBF"],
+      ["#E74C3C","#C0392B","#F5B7B1"], ["#9B59B6","#8E44AD","#D7BDE2"],
+      ["#F39C12","#D68910","#FAD7A0"], ["#1ABC9C","#117864","#A2D9CE"],
+      ["#34495E","#1B2631","#ABB2B9"], ["#E67E22","#BA4A00","#F5CBA7"],
+      ["#16A085","#0E6655","#A2D9CE"], ["#D35400","#A04000","#EDBB99"],
+      ["#7F8C8D","#566573","#D5DBDB"], ["#C0392B","#7B241C","#F5B7B1"],
+      ["#2E86C1","#1B4F72","#A9CCE3"], ["#28B463","#196F3D","#A9DFBF"],
+      ["#AF7AC5","#6C3483","#D2B4DE"],
+    ];
+    const phaseColors = { "Root": { fill: "#4A4A4A", stroke: "#333333", collapsedFill: "#6C757D" },
+                          "Default": { fill: "#BDC3C7", stroke: "#95A5A6", collapsedFill: "#ECF0F1" } };
+    (initialJsonData.children || []).forEach((c, i) => {
+      const pal = PALETTE[i % PALETTE.length];
+      phaseColors[c.name] = { fill: pal[0], stroke: pal[1], collapsedFill: pal[2] };
+    });
+
+    const levelSpecificPalettes = {
+      0: { fill: "#4A4A4A", stroke: "#333333", collapsedFill: "#6C757D" },
+      2: { fill: "#6ab04c", stroke: "#508a38", collapsedFill: "#a3d391" },
+      3: { fill: "#f0932b", stroke: "#d0730f", collapsedFill: "#f6c07e" },
+      4: { fill: "#be2edd", stroke: "#a01cb3", collapsedFill: "#e08bf2" },
+      5: { fill: "#00a8ff", stroke: "#007ac1", collapsedFill: "#74d2ff" },
+      6: { fill: "#e55039", stroke: "#c23620", collapsedFill: "#f09a8d" },
+      default: { fill: "#747d8c", stroke: "#57606f", collapsedFill: "#a4b0be" }
+    };
+
+    const svgElement = d3.select("#tree-svg");
+    const initialSvgWidth = +svgElement.attr("width");
+    const initialSvgHeight = +svgElement.attr("height");
+    const margin = { top: 40, right: 120, bottom: 80, left: 450 };
+    let width = initialSvgWidth - margin.left - margin.right;
+    let height = initialSvgHeight - margin.top - margin.bottom;
+    const duration = 500;
+    let nodeCounter = 0;
+    const g = svgElement.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+    const treemap = d3.tree().nodeSize([40, 0]);
+    let rootNode = d3.hierarchy(treeData, d => d.children);
+    rootNode.x0 = 0;
+    rootNode.y0 = 0;
+
+    if (rootNode.children) {
+      rootNode.children.forEach(d_child => {
+        if (d_child.children) { collapseBranch(d_child); }
+      });
+    }
+    updateTree(rootNode);
+
+    function collapseBranch(d) { if (d.children) { d._children = d.children; d._children.forEach(collapseBranch); d.children = null; } }
+    function expandBranch(d) { if (d._children) { d.children = d._children; d._children = null; } if (d.children) { d.children.forEach(expandBranch); } }
+    window.expandAll = () => { expandBranch(rootNode); updateTree(rootNode); };
+    window.collapseAll = () => { if (rootNode.children) { rootNode.children.forEach(collapseBranch); } updateTree(rootNode); };
+    window.resetView = () => { if (rootNode.children) { rootNode.children.forEach(d_child => { if (d_child.children || d_child._children) { collapseBranch(d_child); } }); } if (rootNode._children && !rootNode.children) { rootNode.children = rootNode._children; rootNode._children = null; } updateTree(rootNode); };
+
+    function updateTree(source) {
+      const treeLayoutData = treemap(rootNode);
+      let nodes = treeLayoutData.descendants();
+      let links = treeLayoutData.descendants().slice(1);
+
+      let minX = 0;
+      let maxX = 0;
+      if (nodes.length > 0) {
+        minX = d3.min(nodes, d => d.x);
+        maxX = d3.max(nodes, d => d.x);
+      }
+
+      let neededHeight = Math.max(initialSvgHeight, maxX - minX + margin.top + margin.bottom + 100);
+      svgElement.transition().duration(duration / 2).attr("height", neededHeight);
+      g.transition().duration(duration / 2).attr("transform", `translate(${margin.left},${margin.top - minX + 40})`);
+
+      nodes.forEach(d => { d.y = d.depth * 400; }); // Adjust horizontal separation if needed
+
+      const node = g.selectAll('g.node').data(nodes, d => d.id || (d.id = ++nodeCounter));
+      const nodeEnter = node.enter().append('g')
+        .attr('class', d => "node" + (d.children || d._children ? " node--internal" : " node--leaf") + (d._children ? " _children" : ""))
+        .attr('transform', d => `translate(${source.y0},${source.x0})`)
+        .on('click', (event, d) => { if (d.children) { d._children = d.children; d.children = null; } else if (d._children) { d.children = d._children; d._children = null; } updateTree(d); })
+        .style('cursor', d => (d.children || d._children) ? 'pointer' : 'default');
+
+      nodeEnter.append('circle').attr('r', 1e-6);
+
+      nodeEnter.append('text')
+        .attr('dy', '.35em')
+        .attr('x', d => d.children || d._children ? -14 : 14)
+        .attr('text-anchor', d => d.children || d._children ? 'end' : 'start')
+        .style("fill-opacity", 1e-6)
+        .call(wrapText, 380);
+
+      const nodeUpdate = nodeEnter.merge(node);
+      nodeUpdate.transition().duration(duration)
+        .attr('transform', d => `translate(${d.y},${d.x})`)
+        .attr('class', d => "node" + (d.children ? " node--internal" : " node--leaf") + (d._children ? " node--internal _children" : ""));
+
+      nodeUpdate.select('circle').attr('r', 8.5)
+        .style('fill', d => {
+            let palette;
+            if (d.depth === 0) {
+                palette = levelSpecificPalettes[0];
+            } else if (d.depth === 1) {
+                palette = phaseColors[d.data.originalStageName] || phaseColors.Default;
+            } else {
+                palette = levelSpecificPalettes[d.depth] || levelSpecificPalettes.default;
+            }
+            if (d._children) return palette.collapsedFill;
+            if (d.children) return palette.fill;
+            return "#fff";
+        })
+        .style('stroke', d => {
+            let palette;
+            if (d.depth === 0) {
+                palette = levelSpecificPalettes[0];
+            } else if (d.depth === 1) {
+                palette = phaseColors[d.data.originalStageName] || phaseColors.Default;
+            } else {
+                palette = levelSpecificPalettes[d.depth] || levelSpecificPalettes.default;
+            }
+            return palette.stroke;
+        });
+      nodeUpdate.select('text').style("fill-opacity", 1).call(wrapText, 380);
+
+      const nodeExit = node.exit().transition().duration(duration).attr('transform', d => `translate(${source.y},${source.x})`).remove();
+      nodeExit.select('circle').attr('r', 1e-6);
+      nodeExit.select('text').style('fill-opacity', 1e-6);
+
+      const link = g.selectAll('path.link').data(links, d => d.id);
+      const linkEnter = link.enter().insert('path', "g").attr('class', 'link').attr('d', d => { const o = { x: source.x0, y: source.y0 }; return diagonal(o, o); });
+
+      linkEnter.merge(link).transition().duration(duration).attr('d', d => diagonal(d, d.parent))
+        .style('stroke', d => {
+            const sourceNode = d.parent;
+            if (!sourceNode) return phaseColors.Default.stroke;
+            const l1AncestorName = sourceNode.data.originalStageName;
+            const colorPalette = phaseColors[l1AncestorName] || phaseColors.Default;
+            return colorPalette.stroke;
+        });
+      link.exit().transition().duration(duration).attr('d', d => { const o = { x: source.x, y: source.y }; return diagonal(o, o); }).remove();
+      nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
+    }
+
+    function diagonal(s, d) { return `M ${s.y} ${s.x} C ${(s.y + d.y) / 2} ${s.x}, ${(s.y + d.y) / 2} ${d.x}, ${d.y} ${d.x}`; }
+
+    function wrapText(textElements, maxWidth) {
+        const textPartColors = {
+            name: '#343a40',
+            count: '#0056b3'
+        };
+        const countRegex = /(\s\(Total Count: \d+\))$/;
+
+        textElements.each(function () {
+            const textD3 = d3.select(this);
+            const originalNodeText = textD3.datum().data.name;
+            const x = parseFloat(textD3.attr("x") || 0);
+            const initialDy = textD3.attr("dy");
+            const textAnchor = textD3.attr("text-anchor");
+            const lineHeight = 1.1;
+
+            textD3.text(null);
+
+            let namePart = originalNodeText;
+            let countPartText = "";
+
+            const countMatch = originalNodeText.match(countRegex);
+            if (countMatch && originalNodeText.endsWith(countMatch[0])) {
+                namePart = originalNodeText.substring(0, originalNodeText.length - countMatch[0].length).trim();
+                countPartText = countMatch[0].trim();
+            }
+
+            const tokens = [];
+            namePart.split(/\s+/).filter(Boolean).forEach(word => {
+                tokens.push({ text: word, type: 'name' });
+            });
+            if (countPartText) {
+                tokens.push({ text: countPartText, type: 'count' });
+            }
+
+            if (tokens.length === 0 && originalNodeText) {
+                tokens.push({ text: originalNodeText, type: 'name' });
+            }
+
+            let currentTspan = textD3.append("tspan").attr("x", x).attr("dy", initialDy);
+            if (textAnchor === "end") currentTspan.attr("text-anchor", "end");
+
+            let lineTokens = [];
+
+            for (let i = 0; i < tokens.length; i++) {
+                const tokenObj = tokens[i];
+
+                lineTokens.push(tokenObj);
+                currentTspan.text(lineTokens.map(t => t.text).join(" "));
+
+                if (currentTspan.node().getComputedTextLength() > maxWidth && lineTokens.length > 1) {
+                    lineTokens.pop();
+
+                    currentTspan.text(null);
+                    lineTokens.forEach((prevToken, idx) => {
+                        currentTspan.append("tspan")
+                            .text((idx > 0 ? " " : "") + prevToken.text)
+                            .style("fill", textPartColors[prevToken.type] || textPartColors.name)
+                            .style("font-weight", prevToken.type === 'count' ? "bold" : "normal");
+                    });
+
+                    lineTokens = [tokenObj];
+                    currentTspan = textD3.append("tspan").attr("x", x).attr("dy", lineHeight + "em");
+                    if (textAnchor === "end") currentTspan.attr("text-anchor", "end");
+                }
+            }
+
+            currentTspan.text(null);
+            lineTokens.forEach((token, idx) => {
+                currentTspan.append("tspan")
+                    .text((idx > 0 ? " " : "") + token.text)
+                    .style("fill", textPartColors[token.type] || textPartColors.name)
+                    .style("font-weight", token.type === 'count' ? "bold" : "normal");
+            });
+
+            if (textD3.selectAll("tspan > tspan").empty() && textD3.select("tspan").text().length === 0 && originalNodeText) {
+                let t = textD3.select("tspan");
+                let displayText = originalNodeText;
+                t.text(displayText).style("fill", textPartColors.name);
+                if (t.node() && t.node().getComputedTextLength() > maxWidth && displayText.length > 20) {
+                    let estimatedChars = Math.floor(maxWidth / (t.node().getComputedTextLength()/displayText.length) );
+                    displayText = displayText.substring(0, Math.max(0, estimatedChars - 3)) + "...";
+                    t.text(displayText);
+                }
+            }
+        });
+    }
+  </script>
+</body>
+</html>
