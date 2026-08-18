@@ -130,6 +130,7 @@ async def create_bookmark(
         "url": payload.url,
         "description": payload.description,
         "is_favorite": payload.is_favorite,
+        "color": payload.color,
         "folder_id": payload.folder_id,
         "section_id": payload.section_id,
         "position": await _next_position(auth, TABLES["bookmarks"]),

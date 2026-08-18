@@ -7,6 +7,7 @@ class BookmarkOut(BaseModel):
     url: str
     description: str | None
     is_favorite: bool = Field(serialization_alias="isFavorite")
+    color: str | None = None
     created_at: str = Field(serialization_alias="createdAt")
     updated_at: str = Field(serialization_alias="updatedAt")
     user_id: str = Field(serialization_alias="userId")
@@ -22,6 +23,7 @@ class BookmarkCreate(BaseModel):
     url: str
     description: str | None = None
     is_favorite: bool = Field(default=False, alias="isFavorite")
+    color: str | None = None
     folder_id: str | None = Field(default=None, alias="folderId")
     section_id: str | None = Field(default=None, alias="sectionId")
 
@@ -33,6 +35,7 @@ class BookmarkUpdate(BaseModel):
     url: str | None = None
     description: str | None = None
     is_favorite: bool | None = Field(default=None, alias="isFavorite")
+    color: str | None = None
     folder_id: str | None = Field(default=None, alias="folderId")
     section_id: str | None = Field(default=None, alias="sectionId")
 

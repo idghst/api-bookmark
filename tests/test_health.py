@@ -1,9 +1,9 @@
+import httpx
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
-from app.api.routes.health import probe_supabase
 from app.core.config import Settings, get_settings
 from app.core.errors import ApiError
 from app.main import create_app
@@ -27,22 +27,105 @@ def client(app: FastAPI) -> TestClient:
     return TestClient(app)
 
 
-def test_liveness(client: TestClient) -> None:
+def test_liveness_returns_ok(client: TestClient) -> None:
     response = client.get("/health/live")
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 
-def test_production_disables_documentation_and_schema() -> None:
+def test_readiness_maps_unavailable_dependency_to_sanitized_503(
+    client: TestClient, app: FastAPI
+) -> None:
+    from app.api.routes.health import probe_supabase
+
+    async def unavailable() -> None:
+        raise ApiError(503, "dependency_unavailable", "Supabase is unavailable")
+
+    app.dependency_overrides[probe_supabase] = unavailable
+
+    response = client.get("/health/ready", headers={"X-Request-ID": "req-ready"})
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "code": "dependency_unavailable",
+        "message": "Supabase is unavailable",
+        "request_id": "req-ready",
+    }
+
+
+def test_readiness_probes_auth_health_with_publishable_key_and_timeout(
+    monkeypatch: pytest.MonkeyPatch, settings: Settings
+) -> None:
+    from app.api.routes.health import probe_supabase
+
+    observed: dict[str, object] = {}
+
+    def healthy(url: str, **kwargs: object) -> httpx.Response:
+        observed["url"] = url
+        observed.update(kwargs)
+        return httpx.Response(204)
+
+    monkeypatch.setattr("app.api.routes.health.httpx.get", healthy)
+
+    probe_supabase(settings)
+
+    assert observed == {
+        "url": "https://test.supabase.co/auth/v1/health",
+        "headers": {"apikey": "sb_publishable_test"},
+        "timeout": 5.0,
+    }
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        httpx.ConnectError("connection refused"),
+        httpx.Response(503),
+    ],
+)
+def test_probe_supabase_sanitizes_upstream_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    settings: Settings,
+    failure: httpx.HTTPError | httpx.Response,
+) -> None:
+    from app.api.routes.health import probe_supabase
+
+    def unavailable(_: str, **__: object) -> httpx.Response:
+        if isinstance(failure, Exception):
+            raise failure
+        return failure
+
+    monkeypatch.setattr("app.api.routes.health.httpx.get", unavailable)
+
+    with pytest.raises(ApiError) as caught:
+        probe_supabase(settings)
+
+    assert caught.value.status_code == 503
+    assert caught.value.code == "dependency_unavailable"
+    assert caught.value.message == "Supabase is unavailable"
+
+
+def test_factory_injects_supplied_settings_and_root_message(
+    app: FastAPI, client: TestClient, settings: Settings
+) -> None:
+    assert app.state.settings is settings
+    assert app.dependency_overrides[get_settings]() is settings
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert response.json() == {"message": "Bookmark API"}
+
+
+def test_production_host_disables_docs_and_openapi() -> None:
     app = create_app(
         Settings(
-            APP_ENV="production",
-            SUPABASE_URL="https://test.supabase.co",
+            SUPABASE_URL="https://example.supabase.co",
             SUPABASE_PUBLISHABLE_KEY=SecretStr("sb_publishable_test"),
         )
     )
-    client = TestClient(app)
+    client = TestClient(app, base_url="http://api.example.com")
 
     for path in ("/docs", "/redoc", "/openapi.json"):
         response = client.get(path, headers={"X-Request-ID": "req-docs"})
@@ -55,38 +138,63 @@ def test_production_disables_documentation_and_schema() -> None:
         }
 
 
-def test_production_exposes_graphql_ide_but_keeps_operations_authenticated() -> None:
+def test_localhost_and_test_hosts_expose_docs(settings: Settings) -> None:
+    app = create_app(settings)
+    for base_url in ("http://localhost:8000", "http://testserver"):
+        client = TestClient(app, base_url=base_url)
+        assert client.get("/openapi.json").status_code == 200
+        assert client.get("/docs").status_code == 200
+
+
+def test_production_host_without_optional_keys_still_serves_app() -> None:
     app = create_app(
         Settings(
-            APP_ENV="production",
-            SUPABASE_URL="https://test.supabase.co",
+            SUPABASE_URL="https://example.supabase.co",
             SUPABASE_PUBLISHABLE_KEY=SecretStr("sb_publishable_test"),
         )
     )
-    client = TestClient(app)
+    client = TestClient(app, base_url="http://api.example.com")
 
-    ide = client.get("/graphql", headers={"Accept": "text/html"})
+    live = client.get("/health/live")
+    root = client.get("/")
 
-    assert ide.status_code == 200
-    assert "GraphiQL" in ide.text
-    assert "isHeadersEditorEnabled: true" in ide.text
-
-    operation = client.post("/graphql", json={"query": "{ status }"})
-
-    assert operation.status_code == 401
-    assert operation.json()["code"] == "authentication_required"
+    assert live.status_code == 200
+    assert root.status_code == 200
 
 
-def test_factory_injects_supplied_settings(app: FastAPI, settings: Settings) -> None:
-    assert app.dependency_overrides[get_settings]() is settings
+def test_production_host_rejects_http_supabase_url() -> None:
+    app = create_app(
+        Settings(
+            SUPABASE_URL="http://localhost:54321",
+            SUPABASE_PUBLISHABLE_KEY=SecretStr("sb_publishable_test"),
+        )
+    )
+    client = TestClient(app, base_url="http://api.example.com")
 
-
-def test_readiness_maps_upstream_failure(client: TestClient, app: FastAPI) -> None:
-    async def unavailable() -> None:
-        raise ApiError(503, "dependency_unavailable", "Supabase is unavailable")
-
-    app.dependency_overrides[probe_supabase] = unavailable
-    response = client.get("/health/ready")
+    response = client.get("/")
 
     assert response.status_code == 503
     assert response.json()["code"] == "dependency_unavailable"
+    assert client.get("/health/live").status_code == 200
+
+
+def test_cors_allows_only_configured_origin(settings: Settings) -> None:
+    client = TestClient(create_app(settings))
+
+    allowed = client.options(
+        "/health/live",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    denied = client.options(
+        "/health/live",
+        headers={
+            "Origin": "https://evil.example.com",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert allowed.headers["access-control-allow-origin"] == "http://localhost:3000"
+    assert denied.status_code == 400

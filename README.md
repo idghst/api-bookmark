@@ -1,24 +1,59 @@
 # fastapi-bookmark
 
-REST와 GraphQL을 함께 제공하는 개인 북마크 FastAPI 서비스입니다.
+`bookmark` Supabase schema를 사용하는 FastAPI 서비스입니다. 테이블은
+`items`, `folders`, `sections`입니다.
 
 - Vercel Python Function
-- Supabase Auth
-- 요청별 사용자 JWT 클라이언트
-- 개인 북마크 앱용 서버 간 공유 키
-- Strawberry GraphQL API
-- `bookmark` schema와 Row Level Security
+- Supabase Auth JWT 또는 서버 간 `X-Bookmark-Key`
 - JSON 오류 응답과 request ID
-- Ruff, mypy, pytest coverage, pip-audit CI
+- Ruff, mypy, pytest coverage 90%, pip-audit CI
 
 ## 보안 구조
 
-`/api/bookmarks`, `/api/folders`, `/api/sections`, `/graphql` 요청은 사용자용
+`/api/bookmarks`, `/api/folders`, `/api/sections` 요청은 사용자용
 `Authorization: Bearer <Supabase access token>` 또는 개인 Next.js 서버용
 `X-Bookmark-Key`를 요구합니다. `X-Bookmark-Key` 요청은
 `SUPABASE_SECRET_KEY` 관리자 클라이언트로 기존 데이터의 유일한 `user_id`
 소유자를 자동 선택하고 같은 소유자 조건으로 제한합니다. 데이터가 비어 있거나
 소유자가 둘 이상이면 서비스 요청을 거부합니다.
+
+환경은 요청 Host/URL hostname으로만 가릅니다. `test`면 test, `dev` 또는
+localhost/127.0.0.1이면 development, 그 외는 production입니다. production host에서는
+`/docs` `/redoc` `/openapi.json`을 비공개합니다. 로그 레벨은 INFO JSON으로
+고정입니다.
+
+## Local development
+
+Python 3.12와 [uv](https://docs.astral.sh/uv/)가 필요합니다.
+
+```bash
+uv sync --locked --dev
+```
+
+`.env.example`을 `.env.local`로 복사한 뒤 실제 키를 넣으세요. 실제 키는 절대
+커밋하지 마세요.
+
+```bash
+uv run uvicorn app.main:app --reload
+```
+
+- API: <http://127.0.0.1:8000>
+- Docs (localhost / Host에 `dev` 또는 `test`): <http://127.0.0.1:8000/docs>
+- Liveness: <http://127.0.0.1:8000/health/live>
+- Readiness: <http://127.0.0.1:8000/health/ready>
+
+환경 변수는 아래만 사용합니다.
+
+```dotenv
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_PUBLISHABLE_KEY=your_publishable_key
+SUPABASE_SECRET_KEY=
+BOOKMARK_API_KEY=
+```
+
+`CORS_ORIGINS`는 `http://localhost:3000`으로 고정입니다. production host에서는
+`SUPABASE_URL`이 HTTPS여야 합니다. 서버 간 호출을 쓰면 `BOOKMARK_API_KEY`와
+`SUPABASE_SECRET_KEY`를 설정하고 `X-Bookmark-Key`만 전달합니다.
 
 ## API
 
@@ -30,7 +65,7 @@ REST와 GraphQL을 함께 제공하는 개인 북마크 FastAPI 서비스입니�
 - `GET /health/ready`
 - `GET /api/v1/auth/me`
 
-Bookmarks:
+Bookmarks (`bookmark.items`):
 
 - `GET /api/bookmarks`
 - `POST /api/bookmarks`
@@ -38,15 +73,16 @@ Bookmarks:
 - `DELETE /api/bookmarks/{bookmark_id}`
 - `POST /api/bookmarks/reorder`
 
-Folders:
+Folders (`bookmark.folders`):
 
 - `GET /api/folders`
+- `GET /api/folders/tree`
 - `POST /api/folders`
 - `PATCH /api/folders/{folder_id}`
 - `DELETE /api/folders/{folder_id}`
 - `POST /api/folders/reorder`
 
-Sections:
+Sections (`bookmark.sections`):
 
 - `GET /api/sections`
 - `POST /api/sections`
@@ -54,43 +90,8 @@ Sections:
 - `DELETE /api/sections/{section_id}`
 - `POST /api/sections/reorder`
 
-GraphQL:
-
-- `GET /graphql` (GraphiQL IDE)
-- `POST /graphql`
-
-REST와 GraphQL resolver는 동일한 인증 의존성과 CRUD 서비스 계층을 사용합니다.
-IDE 화면은 운영 환경에서도 열리지만, 쿼리와 mutation 실행에는 GraphiQL의
-`Headers` 영역에 `X-Bookmark-Key` 또는 `Authorization`을 입력해야 합니다.
-
-## 로컬 실행
-
-Python 3.12와 `uv`가 필요합니다.
-
-```bash
-uv sync --locked --dev
-cp .env.example .env.local
-uv run uvicorn app.main:app --reload
-```
-
-필수 환경 변수:
-
-```dotenv
-APP_ENV=development
-LOG_LEVEL=INFO
-ENABLE_DOCS=true
-CORS_ORIGINS=["http://localhost:3000"]
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_PUBLISHABLE_KEY=your-publishable-key
-SUPABASE_SECRET_KEY=
-SUPABASE_TIMEOUT_SECONDS=5.0
-BOOKMARK_API_KEY=
-```
-
-`CORS_ORIGINS`는 정확한 HTTP(S) origin 배열만 허용합니다. Production에서는
-`SUPABASE_URL`이 HTTPS여야 하며 API 문서는 기본적으로 비활성화됩니다.
-서버 간 호출을 사용하면 `BOOKMARK_API_KEY`와 `SUPABASE_SECRET_KEY`를 설정하고
-`X-Bookmark-Key`만 전달합니다.
+응답 필드는 camelCase입니다 (`isFavorite`, `color`, `folderId`, `sectionId`,
+`parentId`, `createdAt`, `updatedAt`, `userId`).
 
 ## Supabase
 
@@ -125,10 +126,8 @@ curl \
 
 ```bash
 curl \
-  -H "Content-Type: application/json" \
   -H "X-Bookmark-Key: $BOOKMARK_API_KEY" \
-  --data '{"query":"{ bookmarks { id title url } }"}' \
-  http://localhost:8000/graphql
+  http://localhost:8000/api/bookmarks
 ```
 
 오류 응답:
@@ -172,7 +171,6 @@ Preview와 Production에 각각 환경 변수를 설정합니다.
 npx --yes vercel@57 link --yes --scope idghst --project api-bookmark
 npx --yes vercel@57 env add SUPABASE_URL preview production
 npx --yes vercel@57 env add SUPABASE_PUBLISHABLE_KEY preview production
-npx --yes vercel@57 env add CORS_ORIGINS preview production
 ```
 
 배포는 CI 통과 후 source deployment로 수행합니다.
