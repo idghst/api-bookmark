@@ -1,9 +1,18 @@
 import os
 
-os.environ["APP_ENV"] = "test"
-os.environ["ENABLE_DOCS"] = "false"
-os.environ["SUPABASE_URL"] = "https://test.supabase.co"
-os.environ["SUPABASE_PUBLISHABLE_KEY"] = "sb_publishable_test"
-os.environ["SUPABASE_TIMEOUT_SECONDS"] = "5.0"
-os.environ["SUPABASE_SECRET_KEY"] = ""
-os.environ["BOOKMARK_API_KEY"] = ""
+import pytest
+from pydantic_settings import SettingsConfigDict
+
+from app.core.config import Settings, clear_settings_cache
+
+os.environ.setdefault("SUPABASE_URL", "https://test.supabase.co")
+os.environ.setdefault("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test")
+
+Settings.model_config = SettingsConfigDict(env_file=None, extra="ignore")
+
+
+@pytest.fixture(autouse=True)
+def clear_cached_settings() -> None:
+    clear_settings_cache()
+    yield
+    clear_settings_cache()
