@@ -1,8 +1,6 @@
 ---
-description: graphify knowledge graph context
 alwaysApply: true
 ---
-
 This project has a graphify knowledge graph at graphify-out/.
 
 **MANDATORY: Before using Read, Grep, Glob, or Bash to explore the codebase, you MUST run graphify first:**
