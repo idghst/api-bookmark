@@ -6,12 +6,6 @@ MIGRATION = (
     / "migrations"
     / "20260726160000_add_bookmark_resources.sql"
 )
-FOLDER_HIERARCHY_MIGRATION = (
-    Path(__file__).parent.parent
-    / "supabase"
-    / "migrations"
-    / "20260802195716_folder_hierarchy.sql"
-)
 SECTION_COLOR_MIGRATION = (
     Path(__file__).parent.parent
     / "supabase"
@@ -24,17 +18,11 @@ ITEM_COLOR_MIGRATION = (
     / "migrations"
     / "20260818120000_add_item_color.sql"
 )
-SECTION_MOVE_MIGRATION = (
+SECTION_FIRST_HIERARCHY_MIGRATION = (
     Path(__file__).parent.parent
     / "supabase"
     / "migrations"
-    / "20260805093016_move_section_with_bookmarks.sql"
-)
-SECTION_MOVE_CONSTRAINT_FIX_MIGRATION = (
-    Path(__file__).parent.parent
-    / "supabase"
-    / "migrations"
-    / "20260814090000_fix_section_move_constraint.sql"
+    / "20260820100000_section_first_hierarchy.sql"
 )
 
 
@@ -59,24 +47,6 @@ def test_resource_migration_has_operation_specific_owner_policies() -> None:
     assert "to anon" not in sql
 
 
-def test_folder_hierarchy_migration_enforces_safe_tree_and_delete_contract() -> None:
-    sql = FOLDER_HIERARCHY_MIGRATION.read_text()
-
-    assert "add column parent_id uuid" in sql
-    assert "foreign key (parent_id, user_id)" in sql
-    assert "on delete restrict" in sql
-    assert "with recursive ancestors" in sql
-    assert "create trigger folders_parent_integrity" in sql
-    assert "create or replace function bookmark.delete_folder(" in sql
-    assert "security invoker" in sql
-    assert "set search_path = pg_catalog, bookmark" in sql
-    assert (
-        "revoke all on function bookmark.delete_folder(uuid, uuid, uuid) from public"
-        in sql
-    )
-    assert "to authenticated, service_role" in sql
-
-
 def test_section_color_migration_adds_nullable_color_column() -> None:
     assert SECTION_COLOR_MIGRATION.read_text() == (
         "alter table bookmark.sections\n  add column color text;\n"
@@ -89,37 +59,28 @@ def test_item_color_migration_adds_nullable_color_column() -> None:
     )
 
 
-def test_section_move_migration_moves_linked_bookmarks_atomically() -> None:
-    sql = SECTION_MOVE_MIGRATION.read_text()
+def test_section_first_hierarchy_migration_reverses_resource_ownership() -> None:
+    sql = SECTION_FIRST_HIERARCHY_MIGRATION.read_text()
 
-    assert "create or replace function bookmark.move_section(" in sql
+    assert "drop column if exists parent_id" in sql
+    assert "drop column if exists folder_id" in sql
+    assert "drop column if exists section_id" in sql
+    assert "add column if not exists section_id uuid" in sql
+    assert "foreign key (section_id, user_id)" in sql
+    assert "references bookmark.sections (id, user_id)" in sql
+    assert "on delete set null (section_id)" in sql
+    assert "folders_owner_section_position_idx" in sql
+    assert "sections_owner_position_idx" in sql
+    assert "drop function if exists bookmark.move_section" in sql
+    assert "drop trigger if exists folders_parent_integrity" in sql
+    assert "drop function if exists bookmark.enforce_folder_parent_integrity()" in sql
+    assert "create or replace function bookmark.delete_folder(" in sql
+    assert "set folder_id = p_destination_folder_id" in sql
+    assert "and item.folder_id = p_folder_id" in sql
     assert "security invoker" in sql
     assert "set search_path = pg_catalog, bookmark" in sql
-    assert '"position" integer' in sql
-    assert "update bookmark.sections as section" in sql
-    assert "update bookmark.items as item" in sql
-    assert "where item.section_id = p_section_id" in sql
-    assert "set folder_id = p_destination_folder_id" in sql
-    assert "name = case when p_update_name then p_name else section.name end" in sql
-    assert "color = case when p_update_color then p_color else section.color end" in sql
-    assert "coalesce(max(section.position) + 1, 0)" in sql
     assert (
-        "revoke all on function bookmark.move_section(\n"
-        "  uuid, uuid, uuid, text, text, boolean, boolean\n"
-        ") from public" in sql
-    )
-    assert "to authenticated, service_role" in sql
-
-
-def test_section_move_constraint_fix_defers_linked_bookmark_foreign_key() -> None:
-    sql = SECTION_MOVE_CONSTRAINT_FIX_MIGRATION.read_text()
-
-    assert (
-        "alter constraint items_section_owner_fkey deferrable initially immediate"
+        "revoke all on function bookmark.delete_folder(uuid, uuid, uuid) from public"
         in sql
     )
-    assert "set constraints items_section_owner_fkey deferred" in sql
-    assert "create or replace function bookmark.move_section(" in sql
-    assert '"position" integer' in sql
-    assert "security invoker" in sql
     assert "to authenticated, service_role" in sql
