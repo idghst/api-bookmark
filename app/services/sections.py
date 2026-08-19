@@ -1,7 +1,6 @@
 from typing import Any
 from uuid import uuid4
 
-from app.core.errors import ApiError
 from app.integrations.supabase import AuthContext
 from app.schemas import PositionUpdate, SectionCreate, SectionOut, SectionUpdate
 from app.services._db import TABLES, ensure_row, execute, next_position, now, reorder
@@ -26,12 +25,7 @@ async def create_section(
         "id": str(uuid4()),
         "name": payload.name,
         "color": payload.color,
-        "folder_id": payload.folder_id,
-        "position": await next_position(
-            auth,
-            TABLES["sections"],
-            folder_id=payload.folder_id,
-        ),
+        "position": await next_position(auth, TABLES["sections"]),
         "created_at": timestamp,
         "updated_at": timestamp,
         "user_id": auth.user.id,
@@ -46,27 +40,6 @@ async def update_section(
     auth: AuthContext,
 ) -> SectionOut:
     updates = payload.model_dump(by_alias=False, exclude_unset=True)
-    destination_folder_id = updates.pop("folder_id", None)
-
-    if "folder_id" in payload.model_fields_set:
-        if not isinstance(destination_folder_id, str) or not destination_folder_id:
-            raise ApiError(422, "section_folder_invalid", "Section folder is invalid")
-        rows = await execute(
-            auth.client.rpc(
-                "move_section",
-                {
-                    "p_section_id": section_id,
-                    "p_destination_folder_id": destination_folder_id,
-                    "p_user_id": auth.user.id,
-                    "p_name": updates.get("name"),
-                    "p_color": updates.get("color"),
-                    "p_update_name": "name" in updates,
-                    "p_update_color": "color" in updates,
-                },
-            )
-        )
-        return SectionOut(**ensure_row(rows, "Section"))
-
     updates["updated_at"] = now()
     rows = await execute(
         auth.client.table(TABLES["sections"])

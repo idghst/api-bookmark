@@ -7,7 +7,6 @@ from app.services._db import TABLES, ensure_row, execute, next_position, now, re
 from app.services.folders import (
     create_folder,
     delete_folder,
-    list_folder_tree,
     list_folders,
     reorder_folders,
     update_folder,
@@ -28,7 +27,6 @@ __all__ = [
     "delete_folder",
     "delete_section",
     "list_bookmarks",
-    "list_folder_tree",
     "list_folders",
     "list_sections",
     "reorder_bookmarks",
@@ -63,7 +61,6 @@ async def create_bookmark(
         "is_favorite": payload.is_favorite,
         "color": payload.color,
         "folder_id": payload.folder_id,
-        "section_id": payload.section_id,
         "position": await next_position(auth, TABLES["bookmarks"]),
         "created_at": timestamp,
         "updated_at": timestamp,

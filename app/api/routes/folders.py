@@ -6,7 +6,6 @@ from app.integrations.supabase import AuthContext, get_resource_auth_context
 from app.schemas import (
     FolderCreate,
     FolderOut,
-    FolderTreeOut,
     FolderUpdate,
     PositionUpdate,
 )
@@ -19,11 +18,6 @@ AuthDependency = Annotated[AuthContext, Depends(get_resource_auth_context)]
 @router.get("/folders", response_model=list[FolderOut])
 async def list_folders(auth: AuthDependency) -> list[FolderOut]:
     return await folders.list_folders(auth)
-
-
-@router.get("/folders/tree", response_model=list[FolderTreeOut])
-async def list_folder_tree(auth: AuthDependency) -> list[FolderTreeOut]:
-    return await folders.list_folder_tree(auth)
 
 
 @router.post(

@@ -6,7 +6,6 @@ from app.integrations.supabase import AuthContext
 from app.schemas import (
     FolderCreate,
     FolderOut,
-    FolderTreeOut,
     FolderUpdate,
     PositionUpdate,
 )
@@ -24,124 +23,40 @@ async def list_folders(auth: AuthContext) -> list[FolderOut]:
     return sorted(
         folders,
         key=lambda folder: (
-            folder.parent_id is not None,
-            folder.parent_id or "",
+            folder.section_id is not None,
+            folder.section_id or "",
             folder.position,
             folder.id,
         ),
     )
 
 
-async def folder_parent_map(auth: AuthContext) -> dict[str, str | None]:
+async def ensure_section(section_id: str, auth: AuthContext) -> None:
     rows = await execute(
-        auth.client.table(TABLES["folders"])
-        .select("id,parent_id")
+        auth.client.table(TABLES["sections"])
+        .select("id")
+        .eq("id", section_id)
         .eq("user_id", auth.user.id)
     )
-    parents: dict[str, str | None] = {}
-    for row in rows:
-        folder_id = row.get("id")
-        parent_id = row.get("parent_id")
-        if isinstance(folder_id, str) and (
-            parent_id is None or isinstance(parent_id, str)
-        ):
-            parents[folder_id] = parent_id
-    return parents
-
-
-def validate_folder_parent(
-    folder_id: str | None,
-    parent_id: str | None,
-    parents: dict[str, str | None],
-) -> None:
-    if folder_id is not None and folder_id not in parents:
-        raise ApiError(404, "resource_not_found", "Folder not found")
-    if parent_id is None:
-        return
-    if folder_id == parent_id:
-        raise ApiError(
-            422,
-            "folder_parent_invalid",
-            "A folder cannot be its own parent",
-        )
-    if parent_id not in parents:
-        raise ApiError(404, "resource_not_found", "Parent folder not found")
-
-    current_id: str | None = parent_id
-    seen: set[str] = set()
-    while current_id is not None:
-        if current_id == folder_id:
-            raise ApiError(
-                422,
-                "folder_parent_invalid",
-                "A folder cannot be moved into its descendant",
-            )
-        if current_id in seen:
-            raise ApiError(
-                409,
-                "resource_conflict",
-                "Folder structure contains a cycle",
-            )
-        seen.add(current_id)
-        current_id = parents.get(current_id)
-
-
-async def list_folder_tree(auth: AuthContext) -> list[FolderTreeOut]:
-    folders = await list_folders(auth)
-    folder_by_id = {folder.id: folder for folder in folders}
-    children_by_parent: dict[str, list[FolderOut]] = {}
-    roots: list[FolderOut] = []
-
-    for folder in folders:
-        if folder.parent_id is None or folder.parent_id not in folder_by_id:
-            roots.append(folder)
-        else:
-            children_by_parent.setdefault(folder.parent_id, []).append(folder)
-
-    for children in children_by_parent.values():
-        children.sort(key=lambda folder: (folder.position, folder.id))
-    roots.sort(key=lambda folder: (folder.position, folder.id))
-
-    rendered: set[str] = set()
-
-    def build(folder: FolderOut, ancestors: set[str]) -> FolderTreeOut:
-        rendered.add(folder.id)
-        node = FolderTreeOut(**folder.model_dump())
-        next_ancestors = ancestors | {folder.id}
-        node.children = [
-            build(child, next_ancestors)
-            for child in children_by_parent.get(folder.id, [])
-            if child.id not in next_ancestors
-        ]
-        return node
-
-    tree = [build(folder, set()) for folder in roots]
-    for folder in folders:
-        if folder.id not in rendered:
-            tree.append(build(folder, set()))
-    return tree
+    ensure_row(rows, "Section")
 
 
 async def create_folder(
     payload: FolderCreate,
     auth: AuthContext,
 ) -> FolderOut:
-    if payload.parent_id is not None:
-        validate_folder_parent(
-            None,
-            payload.parent_id,
-            await folder_parent_map(auth),
-        )
+    if payload.section_id is not None:
+        await ensure_section(payload.section_id, auth)
     timestamp = now()
     row: dict[str, Any] = {
         "id": str(uuid4()),
         "name": payload.name,
         "color": payload.color,
-        "parent_id": payload.parent_id,
+        "section_id": payload.section_id,
         "position": await next_position(
             auth,
             TABLES["folders"],
-            parent_id=payload.parent_id,
+            section_id=payload.section_id,
         ),
         "created_at": timestamp,
         "updated_at": timestamp,
@@ -157,17 +72,24 @@ async def update_folder(
     auth: AuthContext,
 ) -> FolderOut:
     updates = payload.model_dump(by_alias=False, exclude_unset=True)
-    if "parent_id" in updates:
-        parents = await folder_parent_map(auth)
-        parent_id = updates["parent_id"]
-        if not isinstance(parent_id, str) and parent_id is not None:
-            raise ApiError(422, "folder_parent_invalid", "Folder parent is invalid")
-        validate_folder_parent(folder_id, parent_id, parents)
-        if parent_id != parents[folder_id] and "position" not in updates:
+    if "section_id" in updates:
+        current = ensure_row(
+            await execute(
+                auth.client.table(TABLES["folders"])
+                .select("id,section_id")
+                .eq("id", folder_id)
+                .eq("user_id", auth.user.id)
+            ),
+            "Folder",
+        )
+        section_id = updates["section_id"]
+        if isinstance(section_id, str):
+            await ensure_section(section_id, auth)
+        if section_id != current.get("section_id"):
             updates["position"] = await next_position(
                 auth,
                 TABLES["folders"],
-                parent_id=parent_id,
+                section_id=section_id,
             )
     updates["updated_at"] = now()
     rows = await execute(

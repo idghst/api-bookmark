@@ -24,14 +24,13 @@ BOOKMARK = {
     "updated_at": "2026-01-01T00:00:00+00:00",
     "user_id": "user-123",
     "folder_id": None,
-    "section_id": None,
     "position": 0,
 }
 FOLDER = {
     "id": "folder-1",
     "name": "Work",
     "color": None,
-    "parent_id": None,
+    "section_id": None,
     "position": 0,
     "user_id": "user-123",
 }
@@ -39,7 +38,6 @@ SECTION = {
     "id": "section-1",
     "name": "Reading",
     "color": None,
-    "folder_id": "folder-1",
     "position": 0,
     "user_id": "user-123",
 }
@@ -260,7 +258,7 @@ def test_lists_are_user_scoped(path: str, table: str, row: dict[str, Any]) -> No
         ("/api/folders", {"name": "Work"}, "folders", FOLDER),
         (
             "/api/sections",
-            {"name": "Reading", "folderId": "folder-1"},
+            {"name": "Reading"},
             "sections",
             SECTION,
         ),
@@ -303,8 +301,10 @@ def test_bookmark_creation_preserves_color() -> None:
 
     assert response.status_code == 201
     assert response.json()["color"] == "#64748B"
+    assert "sectionId" not in response.json()
     assert isinstance(fake.queries[1].payload, dict)
     assert fake.queries[1].payload["color"] == "#64748B"
+    assert "section_id" not in fake.queries[1].payload
 
 
 def test_folder_creation_preserves_color() -> None:
@@ -328,82 +328,127 @@ def test_section_creation_preserves_color() -> None:
 
     response = _client(fake).post(
         "/api/sections",
-        json={"name": "Reading", "folderId": "folder-1", "color": "#db2777"},
+        json={"name": "Reading", "color": "#db2777"},
         headers={"Authorization": "Bearer test"},
     )
 
     assert response.status_code == 201
     assert response.json()["color"] == "#db2777"
+    assert "folderId" not in response.json()
     assert isinstance(fake.queries[1].payload, dict)
     assert fake.queries[1].payload["color"] == "#db2777"
+    assert "folder_id" not in fake.queries[1].payload
 
 
-def test_folder_creation_scopes_position_to_its_parent() -> None:
-    child = {**FOLDER, "id": "folder-2", "parent_id": "folder-1"}
-    fake = FakeSupabase([FOLDER], [], [child])
+def test_folder_creation_scopes_position_to_its_section() -> None:
+    folder = {**FOLDER, "id": "folder-2", "section_id": "section-1", "position": 3}
+    fake = FakeSupabase([SECTION], [{"position": 2}], [folder])
 
     response = _client(fake).post(
         "/api/folders",
-        json={"name": "Child", "parentId": "folder-1"},
+        json={"name": "Work", "sectionId": "section-1"},
         headers={"Authorization": "Bearer test"},
     )
 
     assert response.status_code == 201
-    assert fake.queries[0].table == "folders"
+    assert fake.queries[0].table == "sections"
     _assert_user_scoped(fake.queries[0])
-    assert ("parent_id", "folder-1") in fake.queries[1].filters
+    assert ("id", "section-1") in fake.queries[0].filters
+    assert fake.queries[1].table == "folders"
+    assert ("section_id", "section-1") in fake.queries[1].filters
     assert isinstance(fake.queries[2].payload, dict)
-    assert fake.queries[2].payload["parent_id"] == "folder-1"
+    assert fake.queries[2].payload["section_id"] == "section-1"
+    assert fake.queries[2].payload["position"] == 3
 
 
-def test_folder_move_rejects_a_descendant_as_parent() -> None:
-    child = {**FOLDER, "id": "folder-2", "parent_id": "folder-1"}
-    fake = FakeSupabase([FOLDER, child])
+def test_folder_creation_rejects_unknown_section() -> None:
+    response = _client(FakeSupabase([])).post(
+        "/api/folders",
+        json={"name": "Work", "sectionId": "missing"},
+        headers={
+            "Authorization": "Bearer test",
+            "X-Request-ID": "req-create-missing-section",
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "resource_not_found",
+        "message": "Section not found",
+        "request_id": "req-create-missing-section",
+    }
+
+
+def test_folder_move_to_section_recalculates_position_at_destination_end() -> None:
+    destination = {**SECTION, "id": "section-2"}
+    moved = {**FOLDER, "section_id": "section-2", "position": 4}
+    fake = FakeSupabase([FOLDER], [destination], [{"position": 3}], [moved])
 
     response = _client(fake).patch(
         "/api/folders/folder-1",
-        json={"parentId": "folder-2"},
+        json={"sectionId": "section-2"},
         headers={"Authorization": "Bearer test"},
     )
 
-    assert response.status_code == 422
-    assert response.json()["code"] == "folder_parent_invalid"
-    assert len(fake.queries) == 1
-    _assert_user_scoped(fake.queries[0])
+    assert response.status_code == 200
+    assert response.json()["sectionId"] == "section-2"
+    assert response.json()["position"] == 4
+    assert ("section_id", "section-2") in fake.queries[2].filters
+    assert fake.queries[3].payload["section_id"] == "section-2"
+    assert fake.queries[3].payload["position"] == 4
 
 
-def test_folder_tree_returns_nested_nodes_from_flat_folders() -> None:
-    child = {**FOLDER, "id": "folder-2", "name": "Child", "parent_id": "folder-1"}
-    fake = FakeSupabase([child, FOLDER])
+def test_folder_move_to_no_section_recalculates_position() -> None:
+    moved = {**FOLDER, "position": 2}
+    fake = FakeSupabase(
+        [{**FOLDER, "section_id": "section-1"}],
+        [{"position": 1}],
+        [moved],
+    )
 
+    response = _client(fake).patch(
+        "/api/folders/folder-1",
+        json={"sectionId": None},
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["sectionId"] is None
+    assert ("section_id__is", "null") in fake.queries[1].filters
+    assert fake.queries[2].payload["section_id"] is None
+    assert fake.queries[2].payload["position"] == 2
+
+
+def test_folder_move_rejects_unknown_section() -> None:
+    fake = FakeSupabase([FOLDER], [])
+
+    response = _client(fake).patch(
+        "/api/folders/folder-1",
+        json={"sectionId": "missing"},
+        headers={
+            "Authorization": "Bearer test",
+            "X-Request-ID": "req-missing-section",
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "resource_not_found",
+        "message": "Section not found",
+        "request_id": "req-missing-section",
+    }
+    assert len(fake.queries) == 2
+
+
+def test_folder_tree_endpoint_is_no_longer_served() -> None:
+    fake = FakeSupabase()
     response = _client(fake).get(
         "/api/folders/tree",
         headers={"Authorization": "Bearer test"},
     )
 
-    assert response.status_code == 200
-    assert response.json() == [
-        {
-            "id": "folder-1",
-            "name": "Work",
-            "color": None,
-            "parentId": None,
-            "position": 0,
-            "userId": "user-123",
-            "children": [
-                {
-                    "id": "folder-2",
-                    "name": "Child",
-                    "color": None,
-                    "parentId": "folder-1",
-                    "position": 0,
-                    "userId": "user-123",
-                    "children": [],
-                }
-            ],
-        }
-    ]
-    _assert_user_scoped(fake.queries[0])
+    assert response.status_code == 405
+    assert fake.queries == []
 
 
 @pytest.mark.parametrize(
@@ -462,84 +507,9 @@ def test_section_update_preserves_color(color: str | None) -> None:
 
     assert response.status_code == 200
     assert response.json()["color"] == color
+    assert "folderId" not in response.json()
     assert fake.queries[0].payload["color"] == color
-
-
-def test_section_move_uses_atomic_rpc_and_returns_moved_section() -> None:
-    moved_section = {**SECTION, "folder_id": "folder-2", "position": 3}
-    fake = FakeSupabase([moved_section])
-
-    response = _client(fake).patch(
-        "/api/sections/section-1",
-        json={"folderId": "folder-2"},
-        headers={"Authorization": "Bearer test"},
-    )
-
-    assert response.status_code == 200
-    assert response.json()["folderId"] == "folder-2"
-    assert response.json()["position"] == 3
-    assert len(fake.queries) == 1
-    assert fake.queries[0].table == "rpc:move_section"
-    assert fake.queries[0].payload == {
-        "p_section_id": "section-1",
-        "p_destination_folder_id": "folder-2",
-        "p_user_id": "user-123",
-        "p_name": None,
-        "p_color": None,
-        "p_update_name": False,
-        "p_update_color": False,
-    }
-
-
-def test_section_move_updates_name_and_color_in_the_same_rpc() -> None:
-    moved_section = {
-        **SECTION,
-        "folder_id": "folder-2",
-        "position": 3,
-        "name": "Updated reading",
-        "color": "#2166d7",
-    }
-    fake = FakeSupabase([moved_section])
-
-    response = _client(fake).patch(
-        "/api/sections/section-1",
-        json={
-            "folderId": "folder-2",
-            "name": "Updated reading",
-            "color": "#2166d7",
-        },
-        headers={"Authorization": "Bearer test"},
-    )
-
-    assert response.status_code == 200
-    assert response.json()["folderId"] == "folder-2"
-    assert response.json()["name"] == "Updated reading"
-    assert response.json()["color"] == "#2166d7"
-    assert len(fake.queries) == 1
-    assert fake.queries[0].table == "rpc:move_section"
-    assert fake.queries[0].payload == {
-        "p_section_id": "section-1",
-        "p_destination_folder_id": "folder-2",
-        "p_user_id": "user-123",
-        "p_name": "Updated reading",
-        "p_color": "#2166d7",
-        "p_update_name": True,
-        "p_update_color": True,
-    }
-
-
-def test_section_move_rejects_null_folder() -> None:
-    fake = FakeSupabase()
-
-    response = _client(fake).patch(
-        "/api/sections/section-1",
-        json={"folderId": None},
-        headers={"Authorization": "Bearer test"},
-    )
-
-    assert response.status_code == 422
-    assert response.json()["code"] == "validation_error"
-    assert fake.queries == []
+    assert "folder_id" not in fake.queries[0].payload
 
 
 def test_section_list_returns_color() -> None:
@@ -557,7 +527,6 @@ def test_section_list_returns_color() -> None:
             "id": "section-1",
             "name": "Reading",
             "color": "#16a34a",
-            "folderId": "folder-1",
             "position": 0,
             "userId": "user-123",
         }

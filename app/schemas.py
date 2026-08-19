@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AuthMeOut(BaseModel):
@@ -17,7 +17,6 @@ class BookmarkOut(BaseModel):
     updated_at: str = Field(serialization_alias="updatedAt")
     user_id: str = Field(serialization_alias="userId")
     folder_id: str | None = Field(default=None, serialization_alias="folderId")
-    section_id: str | None = Field(default=None, serialization_alias="sectionId")
     position: int = 0
 
     model_config = ConfigDict(populate_by_name=True)
@@ -30,7 +29,6 @@ class BookmarkCreate(BaseModel):
     is_favorite: bool = Field(default=False, alias="isFavorite")
     color: str | None = None
     folder_id: str | None = Field(default=None, alias="folderId")
-    section_id: str | None = Field(default=None, alias="sectionId")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -42,7 +40,6 @@ class BookmarkUpdate(BaseModel):
     is_favorite: bool | None = Field(default=None, alias="isFavorite")
     color: str | None = None
     folder_id: str | None = Field(default=None, alias="folderId")
-    section_id: str | None = Field(default=None, alias="sectionId")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -51,7 +48,7 @@ class FolderOut(BaseModel):
     id: str
     name: str
     color: str | None = None
-    parent_id: str | None = Field(default=None, serialization_alias="parentId")
+    section_id: str | None = Field(default=None, serialization_alias="sectionId")
     position: int = 0
     user_id: str = Field(serialization_alias="userId")
 
@@ -61,7 +58,7 @@ class FolderOut(BaseModel):
 class FolderCreate(BaseModel):
     name: str
     color: str | None = None
-    parent_id: str | None = Field(default=None, alias="parentId")
+    section_id: str | None = Field(default=None, alias="sectionId")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -69,27 +66,15 @@ class FolderCreate(BaseModel):
 class FolderUpdate(BaseModel):
     name: str | None = None
     color: str | None = None
-    parent_id: str | None = Field(default=None, alias="parentId")
-    position: int | None = Field(default=None, ge=0)
+    section_id: str | None = Field(default=None, alias="sectionId")
 
     model_config = ConfigDict(populate_by_name=True)
-
-    @model_validator(mode="after")
-    def position_cannot_be_null(self) -> "FolderUpdate":
-        if "position" in self.model_fields_set and self.position is None:
-            raise ValueError("position cannot be null")
-        return self
-
-
-class FolderTreeOut(FolderOut):
-    children: list["FolderTreeOut"] = Field(default_factory=list)
 
 
 class SectionOut(BaseModel):
     id: str
     name: str
     color: str | None = None
-    folder_id: str = Field(serialization_alias="folderId")
     position: int = 0
     user_id: str = Field(serialization_alias="userId")
 
@@ -99,7 +84,6 @@ class SectionOut(BaseModel):
 class SectionCreate(BaseModel):
     name: str
     color: str | None = None
-    folder_id: str = Field(alias="folderId")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -107,15 +91,8 @@ class SectionCreate(BaseModel):
 class SectionUpdate(BaseModel):
     name: str | None = None
     color: str | None = None
-    folder_id: str | None = Field(default=None, alias="folderId")
 
     model_config = ConfigDict(populate_by_name=True)
-
-    @model_validator(mode="after")
-    def folder_cannot_be_null(self) -> "SectionUpdate":
-        if "folder_id" in self.model_fields_set and self.folder_id is None:
-            raise ValueError("folderId cannot be null")
-        return self
 
 
 class PositionUpdate(BaseModel):

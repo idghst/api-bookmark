@@ -76,7 +76,6 @@ Bookmarks (`bookmark.items`):
 Folders (`bookmark.folders`):
 
 - `GET /api/folders`
-- `GET /api/folders/tree`
 - `POST /api/folders`
 - `PATCH /api/folders/{folder_id}`
 - `DELETE /api/folders/{folder_id}`
@@ -91,7 +90,8 @@ Sections (`bookmark.sections`):
 - `POST /api/sections/reorder`
 
 응답 필드는 camelCase입니다 (`isFavorite`, `color`, `folderId`, `sectionId`,
-`parentId`, `createdAt`, `updatedAt`, `userId`).
+`createdAt`, `updatedAt`, `userId`). `sectionId`는 폴더에서만 사용하며 북마크는
+`folderId`로 폴더에 속합니다.
 
 ## Supabase
 
