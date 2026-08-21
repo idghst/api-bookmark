@@ -41,6 +41,14 @@ SECTION = {
     "position": 0,
     "user_id": "user-123",
 }
+FOLDER_SECTION = {
+    "id": "folder-section-1",
+    "name": "읽을 글",
+    "color": None,
+    "folder_id": "folder-1",
+    "position": 0,
+    "user_id": "user-123",
+}
 
 
 class FakeResponse:
@@ -232,6 +240,7 @@ def test_resources_reject_invalid_service_key() -> None:
         ("/api/bookmarks", "items", BOOKMARK),
         ("/api/folders", "folders", FOLDER),
         ("/api/sections", "sections", SECTION),
+        ("/api/folder-sections", "folder_sections", FOLDER_SECTION),
     ],
 )
 def test_lists_are_user_scoped(path: str, table: str, row: dict[str, Any]) -> None:
@@ -472,6 +481,12 @@ def test_folder_tree_endpoint_is_no_longer_served() -> None:
             "sections",
             {**SECTION, "name": "Updated"},
         ),
+        (
+            "/api/folder-sections/folder-section-1",
+            {"name": "Updated"},
+            "folder_sections",
+            {**FOLDER_SECTION, "name": "Updated"},
+        ),
     ],
 )
 def test_updates_are_user_scoped(
@@ -538,6 +553,7 @@ def test_section_list_returns_color() -> None:
     [
         ("/api/bookmarks/bookmark-1", "items"),
         ("/api/sections/section-1", "sections"),
+        ("/api/folder-sections/folder-section-1", "folder_sections"),
     ],
 )
 def test_deletes_are_user_scoped(path: str, table: str) -> None:
@@ -589,6 +605,7 @@ def test_folder_delete_rejects_itself_as_destination() -> None:
         ("/api/bookmarks/reorder", "items"),
         ("/api/folders/reorder", "folders"),
         ("/api/sections/reorder", "sections"),
+        ("/api/folder-sections/reorder", "folder_sections"),
     ],
 )
 def test_reorders_are_user_scoped(path: str, table: str) -> None:
@@ -611,6 +628,7 @@ def test_reorders_are_user_scoped(path: str, table: str) -> None:
         ("/api/bookmarks/reorder", "Bookmark"),
         ("/api/folders/reorder", "Folder"),
         ("/api/sections/reorder", "Section"),
+        ("/api/folder-sections/reorder", "Folder section"),
     ],
 )
 def test_reorder_missing_resource_uses_stable_404(
@@ -695,3 +713,215 @@ def test_invalid_database_payload_is_sanitized() -> None:
 
     assert response.status_code == 502
     assert response.json()["code"] == "database_response_invalid"
+
+
+def test_folder_section_list_keeps_folder_scope_and_omits_sidebar_section_id() -> None:
+    fake = FakeSupabase([FOLDER_SECTION])
+
+    response = _client(fake).get(
+        "/api/folder-sections",
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "id": "folder-section-1",
+            "name": "읽을 글",
+            "color": None,
+            "folderId": "folder-1",
+            "position": 0,
+            "userId": "user-123",
+        }
+    ]
+    assert "sectionId" not in response.json()[0]
+
+
+def test_folder_section_creation_scopes_position_to_its_folder() -> None:
+    created = {**FOLDER_SECTION, "id": "folder-section-2", "position": 3}
+    fake = FakeSupabase([FOLDER], [{"position": 2}], [created])
+
+    response = _client(fake).post(
+        "/api/folder-sections",
+        json={"name": "읽을 글", "folderId": "folder-1"},
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["folderId"] == "folder-1"
+    assert fake.queries[0].table == "folders"
+    assert ("id", "folder-1") in fake.queries[0].filters
+    assert fake.queries[1].table == "folder_sections"
+    assert ("folder_id", "folder-1") in fake.queries[1].filters
+    assert isinstance(fake.queries[2].payload, dict)
+    assert fake.queries[2].payload["folder_id"] == "folder-1"
+    assert fake.queries[2].payload["position"] == 3
+    assert "section_id" not in fake.queries[2].payload
+
+
+def test_folder_section_creation_rejects_unknown_folder() -> None:
+    response = _client(FakeSupabase([])).post(
+        "/api/folder-sections",
+        json={"name": "읽을 글", "folderId": "missing"},
+        headers={
+            "Authorization": "Bearer test",
+            "X-Request-ID": "req-create-missing-folder",
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "resource_not_found",
+        "message": "Folder not found",
+        "request_id": "req-create-missing-folder",
+    }
+
+
+def test_bookmark_creation_assigns_folder_section_in_same_folder() -> None:
+    bookmark = {
+        **BOOKMARK,
+        "folder_id": "folder-1",
+        "folder_section_id": "folder-section-1",
+    }
+    fake = FakeSupabase([FOLDER_SECTION], [{"position": 1}], [bookmark])
+
+    response = _client(fake).post(
+        "/api/bookmarks",
+        json={
+            "title": "Example",
+            "url": "https://example.com",
+            "folderId": "folder-1",
+            "folderSectionId": "folder-section-1",
+        },
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["folderSectionId"] == "folder-section-1"
+    assert "sectionId" not in response.json()
+    assert fake.queries[0].table == "folder_sections"
+    assert ("folder_id", "folder-1") in fake.queries[1].filters
+    assert ("folder_section_id", "folder-section-1") in fake.queries[1].filters
+    assert isinstance(fake.queries[2].payload, dict)
+    assert fake.queries[2].payload["folder_section_id"] == "folder-section-1"
+    assert "section_id" not in fake.queries[2].payload
+
+
+def test_bookmark_creation_rejects_folder_section_from_another_folder() -> None:
+    other = {**FOLDER_SECTION, "folder_id": "folder-2"}
+    fake = FakeSupabase([other])
+
+    response = _client(fake).post(
+        "/api/bookmarks",
+        json={
+            "title": "Example",
+            "url": "https://example.com",
+            "folderId": "folder-1",
+            "folderSectionId": "folder-section-1",
+        },
+        headers={
+            "Authorization": "Bearer test",
+            "X-Request-ID": "req-cross-folder-section",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "code": "resource_conflict",
+        "message": "Bookmark section must stay in the same folder",
+        "request_id": "req-cross-folder-section",
+    }
+    assert len(fake.queries) == 1
+
+
+def test_bookmark_move_to_folder_section_recalculates_position() -> None:
+    destination = {**FOLDER_SECTION, "id": "folder-section-2"}
+    current = {**BOOKMARK, "folder_id": "folder-1"}
+    moved = {
+        **BOOKMARK,
+        "folder_id": "folder-1",
+        "folder_section_id": "folder-section-2",
+        "position": 4,
+    }
+    fake = FakeSupabase([current], [destination], [{"position": 3}], [moved])
+
+    response = _client(fake).patch(
+        "/api/bookmarks/bookmark-1",
+        json={"folderSectionId": "folder-section-2"},
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["folderSectionId"] == "folder-section-2"
+    assert response.json()["position"] == 4
+    assert ("folder_id", "folder-1") in fake.queries[2].filters
+    assert ("folder_section_id", "folder-section-2") in fake.queries[2].filters
+    assert fake.queries[3].payload["folder_section_id"] == "folder-section-2"
+    assert fake.queries[3].payload["position"] == 4
+
+
+def test_bookmark_move_to_no_folder_section_recalculates_position() -> None:
+    current = {
+        **BOOKMARK,
+        "folder_id": "folder-1",
+        "folder_section_id": "folder-section-1",
+    }
+    moved = {**BOOKMARK, "folder_id": "folder-1", "position": 2}
+    fake = FakeSupabase([current], [{"position": 1}], [moved])
+
+    response = _client(fake).patch(
+        "/api/bookmarks/bookmark-1",
+        json={"folderSectionId": None},
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["folderSectionId"] is None
+    assert ("folder_section_id__is", "null") in fake.queries[1].filters
+    assert fake.queries[2].payload["folder_section_id"] is None
+    assert fake.queries[2].payload["position"] == 2
+
+
+def test_bookmark_move_rejects_folder_section_from_another_folder() -> None:
+    current = {**BOOKMARK, "folder_id": "folder-1"}
+    other = {**FOLDER_SECTION, "folder_id": "folder-2"}
+    fake = FakeSupabase([current], [other])
+
+    response = _client(fake).patch(
+        "/api/bookmarks/bookmark-1",
+        json={"folderSectionId": "folder-section-1"},
+        headers={
+            "Authorization": "Bearer test",
+            "X-Request-ID": "req-move-cross-folder",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "code": "resource_conflict",
+        "message": "Bookmark section must stay in the same folder",
+        "request_id": "req-move-cross-folder",
+    }
+    assert len(fake.queries) == 2
+
+
+def test_bookmark_folder_change_clears_folder_section() -> None:
+    current = {
+        **BOOKMARK,
+        "folder_id": "folder-1",
+        "folder_section_id": "folder-section-1",
+    }
+    moved = {**BOOKMARK, "folder_id": "folder-2", "position": 1}
+    fake = FakeSupabase([current], [{"position": 0}], [moved])
+
+    response = _client(fake).patch(
+        "/api/bookmarks/bookmark-1",
+        json={"folderId": "folder-2"},
+        headers={"Authorization": "Bearer test"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["folderId"] == "folder-2"
+    assert response.json()["folderSectionId"] is None
+    assert fake.queries[2].payload["folder_id"] == "folder-2"
+    assert fake.queries[2].payload["folder_section_id"] is None

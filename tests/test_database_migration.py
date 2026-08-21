@@ -24,6 +24,12 @@ SECTION_FIRST_HIERARCHY_MIGRATION = (
     / "migrations"
     / "20260820100000_section_first_hierarchy.sql"
 )
+FOLDER_SECTIONS_MIGRATION = (
+    Path(__file__).parent.parent
+    / "supabase"
+    / "migrations"
+    / "20260821110000_add_folder_sections.sql"
+)
 
 
 def test_resource_migration_creates_expected_tables() -> None:
@@ -84,3 +90,18 @@ def test_section_first_hierarchy_migration_reverses_resource_ownership() -> None
         in sql
     )
     assert "to authenticated, service_role" in sql
+
+
+def test_folder_sections_migration_keeps_top_level_sections_separate() -> None:
+    sql = FOLDER_SECTIONS_MIGRATION.read_text()
+
+    assert "create table bookmark.folder_sections" in sql
+    assert "folder_id uuid not null" in sql
+    assert "add column folder_section_id uuid" in sql
+    assert "references bookmark.folder_sections (id, folder_id, user_id)" in sql
+    assert "on delete set null (folder_section_id)" in sql
+    assert "delete from bookmark." not in sql
+    assert "drop table" not in sql
+    assert "create or replace function bookmark.move_bookmark_within_folder" in sql
+    assert "destination.folder_id <> source.folder_id" in sql
+    assert "folder_sections_select_own" in sql

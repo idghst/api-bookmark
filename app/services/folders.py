@@ -31,6 +31,16 @@ async def list_folders(auth: AuthContext) -> list[FolderOut]:
     )
 
 
+async def ensure_folder(folder_id: str, auth: AuthContext) -> None:
+    rows = await execute(
+        auth.client.table(TABLES["folders"])
+        .select("id")
+        .eq("id", folder_id)
+        .eq("user_id", auth.user.id)
+    )
+    ensure_row(rows, "Folder")
+
+
 async def ensure_section(section_id: str, auth: AuthContext) -> None:
     rows = await execute(
         auth.client.table(TABLES["sections"])

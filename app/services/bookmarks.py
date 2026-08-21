@@ -4,6 +4,7 @@ from uuid import uuid4
 from app.integrations.supabase import AuthContext
 from app.schemas import BookmarkCreate, BookmarkOut, BookmarkUpdate, PositionUpdate
 from app.services._db import TABLES, ensure_row, execute, next_position, now, reorder
+from app.services.folder_sections import ensure_folder_section
 from app.services.folders import (
     create_folder,
     delete_folder,
@@ -52,6 +53,8 @@ async def create_bookmark(
     payload: BookmarkCreate,
     auth: AuthContext,
 ) -> BookmarkOut:
+    if payload.folder_section_id is not None:
+        await ensure_folder_section(payload.folder_section_id, payload.folder_id, auth)
     timestamp = now()
     row: dict[str, Any] = {
         "id": str(uuid4()),
@@ -61,7 +64,13 @@ async def create_bookmark(
         "is_favorite": payload.is_favorite,
         "color": payload.color,
         "folder_id": payload.folder_id,
-        "position": await next_position(auth, TABLES["bookmarks"]),
+        "folder_section_id": payload.folder_section_id,
+        "position": await next_position(
+            auth,
+            TABLES["bookmarks"],
+            folder_id=payload.folder_id,
+            folder_section_id=payload.folder_section_id,
+        ),
         "created_at": timestamp,
         "updated_at": timestamp,
         "user_id": auth.user.id,
@@ -76,6 +85,38 @@ async def update_bookmark(
     auth: AuthContext,
 ) -> BookmarkOut:
     updates = payload.model_dump(by_alias=False, exclude_unset=True)
+    moving_folder = "folder_id" in updates
+    moving_section = "folder_section_id" in updates
+    if moving_folder or moving_section:
+        current = ensure_row(
+            await execute(
+                auth.client.table(TABLES["bookmarks"])
+                .select("id,folder_id,folder_section_id")
+                .eq("id", bookmark_id)
+                .eq("user_id", auth.user.id)
+            ),
+            "Bookmark",
+        )
+        folder_id = updates["folder_id"] if moving_folder else current.get("folder_id")
+        folder_section_id = (
+            updates["folder_section_id"]
+            if moving_section
+            else current.get("folder_section_id")
+        )
+        if moving_folder and not moving_section:
+            folder_section_id = None
+            updates["folder_section_id"] = None
+        if isinstance(folder_section_id, str):
+            await ensure_folder_section(folder_section_id, folder_id, auth)
+        if folder_id != current.get("folder_id") or folder_section_id != current.get(
+            "folder_section_id"
+        ):
+            updates["position"] = await next_position(
+                auth,
+                TABLES["bookmarks"],
+                folder_id=folder_id,
+                folder_section_id=folder_section_id,
+            )
     updates["updated_at"] = now()
     rows = await execute(
         auth.client.table(TABLES["bookmarks"])

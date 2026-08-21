@@ -17,6 +17,9 @@ class BookmarkOut(BaseModel):
     updated_at: str = Field(serialization_alias="updatedAt")
     user_id: str = Field(serialization_alias="userId")
     folder_id: str | None = Field(default=None, serialization_alias="folderId")
+    folder_section_id: str | None = Field(
+        default=None, serialization_alias="folderSectionId"
+    )
     position: int = 0
 
     model_config = ConfigDict(populate_by_name=True)
@@ -29,6 +32,7 @@ class BookmarkCreate(BaseModel):
     is_favorite: bool = Field(default=False, alias="isFavorite")
     color: str | None = None
     folder_id: str | None = Field(default=None, alias="folderId")
+    folder_section_id: str | None = Field(default=None, alias="folderSectionId")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -40,6 +44,7 @@ class BookmarkUpdate(BaseModel):
     is_favorite: bool | None = Field(default=None, alias="isFavorite")
     color: str | None = None
     folder_id: str | None = Field(default=None, alias="folderId")
+    folder_section_id: str | None = Field(default=None, alias="folderSectionId")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -89,6 +94,32 @@ class SectionCreate(BaseModel):
 
 
 class SectionUpdate(BaseModel):
+    name: str | None = None
+    color: str | None = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class FolderSectionOut(BaseModel):
+    id: str
+    name: str
+    color: str | None = None
+    folder_id: str = Field(serialization_alias="folderId")
+    position: int = 0
+    user_id: str = Field(serialization_alias="userId")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class FolderSectionCreate(BaseModel):
+    name: str
+    color: str | None = None
+    folder_id: str = Field(alias="folderId")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class FolderSectionUpdate(BaseModel):
     name: str | None = None
     color: str | None = None
 

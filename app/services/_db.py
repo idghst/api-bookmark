@@ -12,11 +12,13 @@ TABLES = {
     "bookmarks": "items",
     "folders": "folders",
     "sections": "sections",
+    "folder_sections": "folder_sections",
 }
 RESOURCE_NAMES = {
     TABLES["bookmarks"]: "Bookmark",
     TABLES["folders"]: "Folder",
     TABLES["sections"]: "Section",
+    TABLES["folder_sections"]: "Folder section",
 }
 
 
