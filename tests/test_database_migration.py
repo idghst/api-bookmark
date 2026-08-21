@@ -30,6 +30,18 @@ FOLDER_SECTIONS_MIGRATION = (
     / "migrations"
     / "20260821110000_add_folder_sections.sql"
 )
+FOLDER_SECTIONS_SERVICE_ROLE_GRANT = (
+    Path(__file__).parent.parent
+    / "supabase"
+    / "migrations"
+    / "20260821113000_grant_folder_sections_service_role.sql"
+)
+FOLDER_SECTIONS_DROP_AUTH_USERS_FKEY = (
+    Path(__file__).parent.parent
+    / "supabase"
+    / "migrations"
+    / "20260821120000_drop_folder_sections_auth_users_fkey.sql"
+)
 
 
 def test_resource_migration_creates_expected_tables() -> None:
@@ -105,3 +117,21 @@ def test_folder_sections_migration_keeps_top_level_sections_separate() -> None:
     assert "create or replace function bookmark.move_bookmark_within_folder" in sql
     assert "destination.folder_id <> source.folder_id" in sql
     assert "folder_sections_select_own" in sql
+
+
+def test_folder_sections_service_role_grant_does_not_wipe_data() -> None:
+    sql = FOLDER_SECTIONS_SERVICE_ROLE_GRANT.read_text()
+
+    assert "on bookmark.folder_sections" in sql
+    assert "to service_role" in sql
+    assert "delete from bookmark." not in sql
+    assert "drop table" not in sql
+
+
+def test_folder_sections_drop_auth_users_fkey_keeps_folder_ownership() -> None:
+    sql = FOLDER_SECTIONS_DROP_AUTH_USERS_FKEY.read_text()
+
+    assert "drop constraint folder_sections_user_id_fkey" in sql
+    assert "delete from bookmark." not in sql
+    assert "drop table" not in sql
+    assert "drop constraint folder_sections_folder_id_user_id_fkey" not in sql
