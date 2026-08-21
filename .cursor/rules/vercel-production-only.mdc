@@ -1,0 +1,9 @@
+---
+description: Vercel 배포를 Production으로만 제한한다
+alwaysApply: true
+---
+# Vercel Production 배포
+
+- Vercel 배포는 반드시 Production target으로 수행한다. Preview 배포는 금지한다.
+- CLI에서는 `vercel --prod` 또는 동등한 Production 명령을 명시한다.
+- 배포 후 Production environment, Ready 상태, Production alias/domain을 확인한다.
